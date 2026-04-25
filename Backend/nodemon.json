@@ -1,0 +1,4 @@
+{
+  "watch": ["app.py"],
+  "exec": "docker compose build && docker compose up -d && docker logs -f backend-app-1"
+}
