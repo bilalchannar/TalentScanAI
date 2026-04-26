@@ -1,12 +1,16 @@
 <script>
     import './SharedAuthStyles.css';
     import { replace } from 'svelte-spa-router';
+    import { notify } from '../../notificationStore.js';
+    import { fade } from 'svelte/transition';
+
     let email = '';
     let password = '';
+    let role = 'candidate'; // Visual role selection
 
     async function login() {
         try {
-            const response = await fetch('http://localhost:3000/api/auth/login', {
+            const response = await fetch('http://127.0.0.1:3000/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -16,45 +20,86 @@
 
             const { data, message } = await response.json();
             
-            
-            
-            // Navigate to dashboard
             if(response.status === 200) {
+                // The actual role is coming from the DB, but we use the selection for UI feel
                 localStorage.setItem('token', data.token);
-                console.log('Login successful');
+                localStorage.setItem('role', data.role);
+                localStorage.setItem('name', data.name);
+                localStorage.setItem('email', data.email);
+                notify(`Welcome back, ${data.name}! Logged in as ${data.role}`, 'success');
                 replace('/dash/manage');
-            }else {
-                alert(message);
+            } else {
+                notify(message, 'error');
             }
         } catch (error) {
             console.error('Login error:', error);
+            notify('An error occurred during login', 'error');
         }
     }
 </script>
 
-<h2>Welcome Back!</h2>
-<p>Ready to Find the Perfect Candidate?</p>
+<div class="auth-wrapper" in:fade>
+    <div class="auth-container">
+        <div class="auth-form-section">
+            <div class="auth-header">
+                <h2>Welcome Back</h2>
+                <p>Sign in to access your dashboard</p>
+            </div>
 
-<form on:submit|preventDefault={login}>
-    <input 
-        type="email" 
-        bind:value={email} 
-        name="email" 
-        placeholder="Email address" 
-        required 
-    />
-    <input 
-        type="password" 
-        bind:value={password} 
-        name="password" 
-        placeholder="Password" 
-        required 
-    />
-    <br>
-    <button type="submit">Login</button>
-</form>
+            <!-- Role Selector -->
+            <div class="role-toggle">
+                <button 
+                    class="role-btn" 
+                    class:active={role === 'candidate'} 
+                    on:click={() => role = 'candidate'}
+                >
+                    👤 Candidate
+                </button>
+                <button 
+                    class="role-btn" 
+                    class:active={role === 'recruiter'} 
+                    on:click={() => role = 'recruiter'}
+                >
+                    🏢 Recruiter
+                </button>
+            </div>
 
-<div class="extra-links">
-    <p style="margin-bottom: 10px;">Don't have an account? <a href="/#/auth/signup">Sign Up</a></p>
-    <a href="/#/auth/forgot">Forgot Password?</a>
+            <form on:submit|preventDefault={login}>
+                <div class="input-group">
+                    <label for="email">Email Address</label>
+                    <input 
+                        type="email" 
+                        id="email"
+                        bind:value={email} 
+                        placeholder="e.g. bilal@example.com" 
+                        required 
+                    />
+                </div>
+                
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password"
+                        bind:value={password} 
+                        placeholder="••••••••" 
+                        required 
+                    />
+                </div>
+
+                <button type="submit" class="submit-btn">Sign In</button>
+            </form>
+
+            <div class="extra-links">
+                <p>Don't have an account? <a href="/#/auth/signup">Create Account</a></p>
+                <a href="/#/auth/forgot" style="display: block; margin-top: 15px; font-weight: 500; font-size: 13px;">Forgot Password?</a>
+            </div>
+        </div>
+
+        <div class="auth-image-section">
+            <img src="imgs/front.png" alt="Login Graphic">
+            <h3>Enterprise-Grade AI Ranking</h3>
+            <p style="opacity: 0.8; margin-top: 10px; font-size: 14px;">Join thousands of recruiters finding the best talent in seconds with TalentScanAI.</p>
+        </div>
+    </div>
 </div>

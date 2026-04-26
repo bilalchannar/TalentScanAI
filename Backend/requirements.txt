@@ -2,3 +2,7 @@ flask
 pyjwt
 pymongo
 flask-cors
+werkzeug
+PyPDF2
+scikit-learn
+python-dotenv

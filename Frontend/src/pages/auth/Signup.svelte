@@ -1,133 +1,105 @@
 <script>
+    import './SharedAuthStyles.css';
     import { replace } from 'svelte-spa-router';
+    import { notify } from '../../notificationStore.js';
+    import { fade } from 'svelte/transition';
     
     let name = '';
     let email = '';
     let password = '';
     let confirmPassword = '';
+    let role = 'candidate';
 
     async function signup(event) {
         event.preventDefault();
         
-        // Validate passwords match
         if (password !== confirmPassword) {
-            alert("Passwords don't match!");
+            notify("Passwords don't match!", "error");
             return;
         }
 
         try {
-            const response = await fetch('http://localhost:3000/api/auth/signup', {
+            const response = await fetch('http://127.0.0.1:3000/api/auth/signup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ name, email, password }),
+                body: JSON.stringify({ name, email, password, role }),
             });
 
-            const { data, message } = await response.json();
+            const { message } = await response.json();
             
             if(response.status === 201) {
-                alert('User registered successfully');
+                notify(`Success! Registered as ${role.toUpperCase()}`, 'success');
                 replace('/auth/login');
             } else {
-                alert(message);
+                notify(message, 'error');
             }
         } catch (error) {
             console.error('Signup error:', error);
-            alert('An error occurred during signup');
+            notify('An error occurred during signup', 'error');
         }
     }
 </script>
 
-<h2>Join the Future of Recruitment</h2>
-<p>Sign Up and Unlock Smarter Hiring</p>
-<div class="main-content">
-    <section class="signup-section">
-        <form on:submit={signup}>
-            <input 
-                type="text" 
-                bind:value={name}
-                placeholder="Full Name" 
-                required
-            >
-            <input 
-                type="email" 
-                bind:value={email}
-                placeholder="Email" 
-                required
-            >
-            <input 
-                type="password" 
-                bind:value={password}
-                placeholder="Password" 
-                required
-            >
-            <input 
-                type="password" 
-                bind:value={confirmPassword}
-                placeholder="Confirm Password" 
-                required
-            >
-            <button type="submit">Sign Up</button>
-        </form>
-        <div class="extra-links">
-            <p>Already have an account? <a href="/#/auth/login">Log in</a></p>
-        </div>
-    </section>
-    <aside class="image-section">
-        <img src="imgs/front.png" alt="Teamwork Illustration">
-    </aside>
-</div>
+<div class="auth-wrapper" in:fade>
+    <div class="auth-container">
+        <div class="auth-form-section">
+            <div class="auth-header">
+                <h2>Create Account</h2>
+                <p>Join the future of AI-powered recruitment</p>
+            </div>
 
-<style>
-    .main-content {
-        display: flex;
-        justify-content: space-between;
-        padding: 40px;
-    }
-    .signup-section {
-        flex: 1;
-        padding-left: 20px;
-    }
-    .signup-section p {
-        margin-bottom: 20px;
-        color: #777;
-    }
-    .signup-section form {
-        width: 100%;
-        max-width: 400px;
-    }
-    .signup-section form input,
-    .signup-section form button {
-        width: 100%;
-        padding: 10px;
-        margin: 10px 0;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-    }
-    .signup-section form button {
-        background-color: #6c63ff;
-        color: white;
-        border: none;
-        cursor: pointer;
-    }
-    .signup-section form button:hover {
-        background-color: #4b47c2;
-    }
-    .signup-section .extra-links {
-        margin-top: 10px;
-    }
-    .signup-section .extra-links a {
-        color: #6c63ff;
-        text-decoration: none;
-    }
-    .image-section {
-        margin-left: 50px;
-        flex: 1;
-    }
-    .image-section img {
-        width: 100%;
-        height: auto;
-        object-fit: cover;
-    }
-</style>
+            <div class="role-toggle">
+                <button 
+                    class="role-btn" 
+                    class:active={role === 'candidate'} 
+                    on:click={() => role = 'candidate'}
+                >
+                    👤 Candidate
+                </button>
+                <button 
+                    class="role-btn" 
+                    class:active={role === 'recruiter'} 
+                    on:click={() => role = 'recruiter'}
+                >
+                    🏢 Recruiter
+                </button>
+            </div>
+
+            <form on:submit={signup}>
+                <div class="input-group">
+                    <label>Full Name</label>
+                    <input type="text" bind:value={name} placeholder="e.g. Bilal Tariq" required>
+                </div>
+                
+                <div class="input-group">
+                    <label>Email Address</label>
+                    <input type="email" bind:value={email} placeholder="email@example.com" required>
+                </div>
+
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" bind:value={password} placeholder="Create a strong password" required>
+                </div>
+
+                <div class="input-group">
+                    <label>Confirm Password</label>
+                    <input type="password" bind:value={confirmPassword} placeholder="Repeat password" required>
+                </div>
+
+                <button type="submit" class="submit-btn">Get Started</button>
+            </form>
+
+            <div class="extra-links">
+                <p>Already have an account? <a href="/#/auth/login">Sign In</a></p>
+            </div>
+        </div>
+
+        <div class="auth-image-section">
+            <img src="imgs/front.png" alt="Signup Illustration">
+            <h3>Start Your Journey</h3>
+            <p style="opacity: 0.8; margin-top: 10px; font-size: 14px;">Whether you're hiring or seeking, our AI ensures the perfect match every single time.</p>
+        </div>
+    </div>
+</div>

@@ -23,3 +23,9 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Project specific
+Backend/static/resumes/*
+!Backend/static/resumes/.gitkeep
+Backend/cleanup_db.py
+Frontend/public/build/

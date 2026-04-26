@@ -1,157 +1,363 @@
-<header style="display: flex; align-items: center;">
-    <h1>Rank Resumes</h1>
-</header>
+<script>
+    import { notify } from '../../notificationStore.js';
+    import SkillTag from '../../components/SkillTag.svelte';
+    import { fade, fly } from 'svelte/transition';
+    import { push } from 'svelte-spa-router';
+    import { reasoningReport } from '../../reasoningStore.js';
 
-<div class="job-section">
-    <div class="job-description">
-        <h2>Enter Job Description</h2>
-        <textarea placeholder="Copy-paste or type it here..." rows="10" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;"></textarea>
+    let userRole = localStorage.getItem('role') || 'candidate';
+    let userName = localStorage.getItem('name') || 'User';
+
+    let jobDescription = '';
+    let results = [];
+    let isRanking = false;
+    let selectedPdf = null;
+
+    async function rankResumes() {
+        if (!jobDescription.trim()) {
+            notify("Please enter a job description", "info");
+            return;
+        }
+
+        isRanking = true;
+        try {
+            const endpoint = userRole === 'recruiter' 
+                ? 'http://127.0.0.1:3000/api/resumes/rank'
+                : 'http://127.0.0.1:3000/api/resumes/rank'; // We use the same but filter in UI
+            
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ job_description: jobDescription })
+            });
+            const result = await res.json();
+            
+            if (result.success) {
+                if (userRole === 'recruiter') {
+                    results = result.data || [];
+                } else {
+                    // CANDIDATE: Only show their OWN result
+                    results = (result.data || []).filter(r => r.name.toLowerCase().includes(userName.toLowerCase()));
+                }
+                notify(userRole === 'recruiter' ? 'Ranking complete!' : 'Analysis complete!', 'success');
+            } else {
+                notify(result.message, 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            notify("Analysis failed", "error");
+        } finally {
+            isRanking = false;
+        }
+    }
+
+    function viewPdf(filename) {
+        selectedPdf = `http://127.0.0.1:3000/api/resumes/view/${filename}`;
+    }
+
+    function showReasoning(result) {
+        reasoningReport.set(result);
+        push('/dash/reasoning');
+    }
+</script>
+
+<div class="rank-page">
+    <div class="rank-container glass">
+        <div class="header-section">
+            <div class="title-group">
+                <h2>{userRole === 'recruiter' ? 'AI Matching Engine' : 'AI Match Checker'}</h2>
+                <p>{userRole === 'recruiter' ? 'Paste your Job Description below to find the best candidates' : 'Paste a Job Description to see how well you match the role'}</p>
+            </div>
+            <button class="primary-btn" on:click={rankResumes} disabled={isRanking}>
+                {#if isRanking}
+                    <span class="spinner"></span> Analyzing...
+                {:else}
+                    {userRole === 'recruiter' ? '✨ Start AI Ranking' : '🚀 Analyze My Match'}
+                {/if}
+            </button>
+        </div>
+
+        <textarea 
+            bind:value={jobDescription} 
+            placeholder="Requirements: Python, Svelte, 3+ years experience..."
+            rows="10"
+        ></textarea>
     </div>
+
+    {#if results.length > 0}
+        <div class="results-section" in:fade>
+            <div class="section-header">
+                <h3>{userRole === 'recruiter' ? `Match Results (${results.length})` : 'Your Match Analysis'}</h3>
+            </div>
+            
+            <div class="results-grid">
+                {#each results as result, index}
+                    <div class="result-card" in:fly={{ y: 20, delay: index * 100 }}>
+                        <div class="rank-badge">#{index + 1}</div>
+                        <div class="card-content">
+                            <div class="main-info">
+                                <h4>{result.name}</h4>
+                                <div class="score-pill" style="--score-color: {result.score > 80 ? '#10b981' : result.score > 50 ? '#f59e0b' : '#64748b'}">
+                                    {result.score}% Match
+                                </div>
+                            </div>
+                            
+                            <p class="filename">📄 {result.filename.split('_').slice(1).join('_')}</p>
+                            
+                            <div class="skills-preview">
+                                <SkillTag skill="Extracted Match" />
+                                <SkillTag skill="AI Verified" />
+                            </div>
+
+                            <div class="actions">
+                                <button class="secondary-btn" on:click={() => viewPdf(result.filename)}>👁️ View Resume</button>
+                                <button class="text-btn" on:click={() => showReasoning(result)}>View Reasoning</button>
+                            </div>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </div>
+    {/if}
+
+    {#if selectedPdf}
+        <div class="modal-overlay" on:click={() => selectedPdf = null}>
+            <div class="modal-content" on:click|stopPropagation>
+                <div class="modal-header">
+                    <h3>Resume Preview</h3>
+                    <button class="close-btn" on:click={() => selectedPdf = null}>&times;</button>
+                </div>
+                <iframe src={selectedPdf} title="PDF Preview" width="100%" height="800px"></iframe>
+            </div>
+        </div>
+    {/if}
 </div>
 
-<section class="content">
-    <div class="table-section">
-        <table>
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Name</th>
-                    <th>Skills</th>
-                    <th>Ranking</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>1</td>
-                    <td>John Doe</td>
-                    <td>Java, Python, SQL</td>
-                    <td>95</td>
-                    <td><button>View Reasoning</button></td>
-                </tr>
-                <tr>
-                    <td>2</td>
-                    <td>Michael White</td>
-                    <td>JavaScript, Node.js, HTML</td>
-                    <td>90</td>
-                    <td><button>View Reasoning</button></td>
-                </tr>
-                <tr>
-                    <td>3</td>
-                    <td>Jane Smith</td>
-                    <td>HTML, CSS, JavaScript</td>
-                    <td>88</td>
-                    <td><button>View Reasoning</button></td>
-                </tr>
-                <tr>
-                    <td>4</td>
-                    <td>Bob Johnson</td>
-                    <td>Python, Data Science, AI</td>
-                    <td>85</td>
-                    <td><button>View Reasoning</button></td>
-                </tr>
-                <tr>
-                    <td>5</td>
-                    <td>Alice Brown</td>
-                    <td>C++, Java, Algorithms</td>
-                    <td>80</td>
-                    <td><button>View Reasoning</button></td>
-            </tbody>
-        </table>
-    </div>
-</section>
-
 <style>
-    .content {
-        padding: 20px;
+    .rank-page {
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
     }
 
-    .job-section {
+    .rank-container {
+        padding: 40px;
+        border-radius: 24px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow);
+    }
+
+    .header-section {
         display: flex;
         justify-content: space-between;
-        gap: 20px;
-        flex-wrap: wrap;
-        padding: 20px;
+        align-items: flex-start;
+        margin-bottom: 30px;
     }
 
-    .job-description {
-        flex: 1;
-        min-width: 300px;
-        background: white;
-        padding: 20px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    .title-group h2 {
+        margin: 0;
+        font-size: 24px;
     }
 
-    .job-description textarea {
+    .title-group p {
+        color: var(--text-secondary);
+        margin: 8px 0 0 0;
+        font-size: 14px;
+    }
+
+    textarea {
         width: 100%;
-        padding: 15px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 20px;
+        color: var(--text-primary);
+        font-family: inherit;
+        font-size: 15px;
         resize: vertical;
-        font-family: 'Arial', sans-serif;
-        font-size: 16px;
-        color: #333;
-        background-color: #f8f8f8;
-        box-sizing: border-box;
-        transition: all 0.2s ease-in-out;
+        transition: var(--transition);
     }
 
-    .job-description textarea:focus {
+    textarea:focus {
         outline: none;
-        border-color: #4b62f6;
-        box-shadow: 0 0 5px rgba(75, 98, 246, 0.2);
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
     }
 
-    .table-section table {
-        width: 100%;
-        border-collapse: collapse;
+    .primary-btn {
+        background: var(--accent-primary);
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: var(--transition);
+        box-shadow: 0 8px 15px rgba(79, 70, 229, 0.2);
+    }
+
+    .primary-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 20px rgba(79, 70, 229, 0.3);
+    }
+
+    .primary-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .results-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .result-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 24px;
+        position: relative;
+        display: flex;
+        gap: 20px;
+        box-shadow: var(--shadow);
+    }
+
+    .rank-badge {
+        background: var(--accent-primary);
+        color: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .card-content {
+        flex: 1;
+    }
+
+    .main-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .main-info h4 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .score-pill {
+        background: var(--bg-primary);
+        color: var(--score-color);
+        border: 1px solid var(--score-color);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .filename {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+    }
+
+    .skills-preview {
         margin-bottom: 20px;
     }
 
-    .table-section th,
-    .table-section td {
-        padding: 10px;
-        text-align: center;
-        border: 1px solid #ccc;
+    .actions {
+        display: flex;
+        gap: 15px;
     }
 
-    .table-section th {
-        background-color: #f4f4f4;
-    }
-
-    .table-section td button {
-        background-color: #4b62f6;
-        color: white;
-        border: none;
-        padding: 5px 10px;
+    .secondary-btn {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
-        border-radius: 5px;
+        transition: var(--transition);
     }
 
-    @media (max-width: 768px) {
-        header {
-            flex-direction: column;
-            align-items: center;
-        }
+    .secondary-btn:hover {
+        background: var(--border-color);
+    }
 
-        .table-section table {
-            font-size: 14px;
-        }
+    .text-btn {
+        background: none;
+        border: none;
+        color: var(--accent-primary);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
 
-        .table-section th,
-        .table-section td {
-            padding: 8px;
-        }
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(5px);
+    }
 
-        .job-section {
-            flex-direction: column;
-            gap: 10px;
-        }
+    .modal-content {
+        background: var(--bg-secondary);
+        width: 90%;
+        max-width: 1000px;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
 
-        .job-description {
-            min-width: 100%;
-        }
+    .modal-header {
+        padding: 20px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        font-size: 30px;
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+        margin-right: 8px;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
     }
 </style>

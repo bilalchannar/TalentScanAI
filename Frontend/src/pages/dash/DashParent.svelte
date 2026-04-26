@@ -1,11 +1,25 @@
 <script>
-    import Router from 'svelte-spa-router';
+    import Router, { location } from 'svelte-spa-router';
+    import ThemeToggle from '../../components/ThemeToggle.svelte';
+    import { onMount } from 'svelte';
 
     import Change from "./Change.svelte";
 	import Education from "./Education.svelte";
 	import Manage from "./Manage.svelte";
 	import Rank from "./Rank.svelte";
 	import Support from "./Support.svelte";
+	import Stats from "./Stats.svelte";
+    import Reasoning from "./Reasoning.svelte";
+
+    let userRole = 'candidate';
+    let userName = 'User';
+    let userEmail = '';
+
+    onMount(() => {
+        userRole = localStorage.getItem('role') || 'candidate';
+        userName = localStorage.getItem('name') || 'User';
+        userEmail = localStorage.getItem('email') || '';
+    });
 
 	const routes = {
         '/dash/change': Change,
@@ -13,27 +27,102 @@
 		'/dash/manage': Manage,
 		'/dash/rank': Rank,
 		'/dash/support': Support,
+        '/dash/stats': Stats,
+        '/dash/reasoning': Reasoning
     }
+
+    $: isActive = (path) => $location === path;
 </script>
 
 <div class="container">
     <aside class="sidebar">
-        <div class="logo">
-            <img src="imgs/logo.png" alt="Logo" style="height: 25px; width: 45px;">
-            TalentScanAI
+        <div class="top-section">
+            <div class="logo">
+                <div class="logo-icon">TS</div>
+                <span>TalentScanAI</span>
+            </div>
+
+            <div class="user-pill">
+                <div class="u-avatar">{userName[0]}</div>
+                <div class="u-info">
+                    <p class="u-name">{userName}</p>
+                    <p class="u-role">{userRole.toUpperCase()}</p>
+                </div>
+            </div>
+            
+            <nav>
+                <ul>
+                    {#if userRole === 'recruiter'}
+                        <li>
+                            <a href="/#/dash/manage" class:active={isActive('/dash/manage')}>
+                                <span class="nav-icon">📁</span> Manage Resumes
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/#/dash/rank" class:active={isActive('/dash/rank')}>
+                                <span class="nav-icon">📊</span> AI Ranking
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/#/dash/stats" class:active={isActive('/dash/stats')}>
+                                <span class="nav-icon">📈</span> Analytics
+                            </a>
+                        </li>
+                    {:else}
+                        <li>
+                            <a href="/#/dash/manage" class:active={isActive('/dash/manage')}>
+                                <span class="nav-icon">📄</span> My Application
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/#/dash/rank" class:active={isActive('/dash/rank')}>
+                                <span class="nav-icon">💼</span> Job Feed
+                            </a>
+                        </li>
+                    {/if}
+                    
+                    <li>
+                        <a href="/#/dash/support" class:active={isActive('/dash/support')}>
+                            <span class="nav-icon">🎧</span> Support
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/#/dash/change" class:active={isActive('/dash/change')}>
+                            <span class="nav-icon">⚙️</span> Settings
+                        </a>
+                    </li>
+                </ul>
+            </nav>
         </div>
-        <nav>
-            <ul>
-                <li><a href="/#/dash/manage">Manage Resumes</a></li>
-                <li><a href="/#/dash/rank">Rank Resumes</a></li>
-                <li><a href="/#/dash/support">Support</a></li>
-                <li><a href="/#/dash/change">Settings</a></li>
-                <li><a href="/#/auth/logout">Logout</a></li>
-            </ul>
-        </nav>
+
+        <div class="bottom-section">
+            <div class="theme-wrapper">
+                <ThemeToggle />
+            </div>
+            <a href="/#/auth/logout" class="logout-btn">
+                <span class="nav-icon">🚪</span> Logout
+            </a>
+        </div>
     </aside>
+
     <main class="main-content">
-        <Router {routes} />
+        <div class="glass-header">
+            <h2>
+                {#if userRole === 'recruiter'}
+                    {isActive('/dash/manage') ? 'Resume Management' : 
+                     isActive('/dash/rank') ? 'AI Ranking Engine' : 
+                     isActive('/dash/stats') ? 'Talent Analytics' : 
+                     isActive('/dash/change') ? 'Account Settings' : 'Recruiter Dashboard'}
+                {:else}
+                    {isActive('/dash/manage') ? 'My Professional Profile' : 
+                     isActive('/dash/rank') ? 'Discover Opportunities' : 
+                     isActive('/dash/change') ? 'Account Settings' : 'Candidate Portal'}
+                {/if}
+            </h2>
+        </div>
+        <div class="page-content">
+            <Router {routes} />
+        </div>
     </main>
 </div>
 
@@ -42,81 +131,175 @@
     display: flex;
     height: 100vh;
     width: 100vw;
+    background-color: var(--bg-primary);
 }
 
 .sidebar {
-    width: 250px;
-    background-color: #4c3dd3;
-    color: white;
-    padding: 20px;
+    width: 280px;
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    padding: 30px 20px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     position: fixed;
     height: 100%;
-    top: 0;
-    left: 0;
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    z-index: 100;
 }
 
-.sidebar .logo {
+.logo {
     display: flex;
     align-items: center;
-    font-size: 24px;
-    font-weight: bold;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 40px;
+    color: var(--accent-primary);
+}
+
+.logo-icon {
+    background: var(--accent-primary);
+    color: white;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.user-pill {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    background: var(--bg-primary);
+    border-radius: 16px;
     margin-bottom: 30px;
+    border: 1px solid var(--border-color);
 }
 
-.sidebar .logo img {
-    height: 25px;
-    width: 45px;
-    margin-right: 10px;
+.u-avatar {
+    width: 36px;
+    height: 36px;
+    background: var(--accent-primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
 }
 
-.sidebar nav ul {
+.u-name {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.u-role {
+    font-size: 10px;
+    font-weight: 800;
+    margin: 2px 0 0 0;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+nav ul {
     list-style: none;
     padding: 0;
 }
 
-.sidebar nav ul li {
-    margin: 15px 0;
+nav ul li {
+    margin-bottom: 8px;
 }
 
-.sidebar nav ul li a {
-    color: white;
+nav ul li a {
+    color: var(--text-secondary);
     text-decoration: none;
-    font-size: 18px;
-    padding: 10px;
-    display: block;
-    border-radius: 5px;
-    transition: background-color 0.2s;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 12px;
+    transition: var(--transition);
 }
 
-.sidebar nav ul li a:hover {
-    background-color: #3e2c9c;
+nav ul li a:hover {
+    background-color: var(--bg-primary);
+    color: var(--accent-primary);
+}
+
+nav ul li a.active {
+    background-color: var(--accent-primary);
+    color: white;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.nav-icon {
+    font-size: 18px;
+}
+
+.bottom-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.logout-btn {
+    color: #ef4444;
+    text-decoration: none;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    border-radius: 12px;
+    transition: var(--transition);
+}
+
+.logout-btn:hover {
+    background-color: #fee2e2;
 }
 
 .main-content {
-    margin-left: 250px;
-    padding: 20px;
+    margin-left: 280px;
     flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
-@media (max-width: 768px) {
-    .container {
-        flex-direction: column;
-    }
+.glass-header {
+    position: sticky;
+    top: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 20px 40px;
+    z-index: 90;
+}
 
+.page-content {
+    padding: 40px;
+    max-width: 1200px;
+}
+
+@media (max-width: 1024px) {
     .sidebar {
-        width: 100%;
-        position: static;
-        height: auto;
-        box-shadow: none;
+        width: 80px;
+        padding: 30px 10px;
     }
-
+    .logo span, nav ul li a span:not(.nav-icon) {
+        display: none;
+    }
     .main-content {
-        margin-left: 0;
-        padding: 10px;
+        margin-left: 80px;
     }
 }
 </style>

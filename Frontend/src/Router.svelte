@@ -4,6 +4,7 @@
 
 	import AuthParent from './pages/auth/AuthParent.svelte';
 	import DashParent from './pages/dash/DashParent.svelte';
+	import Toast from './components/Toast.svelte';
 
 	const routes = {
 		'/auth/*': AuthParent,
@@ -16,3 +17,4 @@
 </script>
 
 <Router {routes} />
+<Toast />
