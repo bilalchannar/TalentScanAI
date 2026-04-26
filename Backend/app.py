@@ -113,16 +113,16 @@ def forgot():
     data = request.get_json()
 
     if not data:
-        return jsonify({ "error": "Request body must be in JSON" }), 400
+        return response(400, "Request body must be in JSON")
 
     email = data.get('email')
 
     if not email:
-        return jsonify({ "error": "Email field is required" }), 400
+        return response(400, "Email field is required")
 
     user = users_collection.find_one({ "email": email })
     if not user:
-        return jsonify({"error": "No such user found"}), 400
+        return response(400, "No such user found")
 
     # Generate a unique reset token
     reset_token = str(uuid4())
@@ -130,7 +130,7 @@ def forgot():
 
     # TODO: send token via email
 
-    return jsonify({ "message": "Password reset token generated" }), 200
+    return response(200, "Password reset token generated")
 
 # ---------------------------------------------------------------------------- #
 # TODO: check
@@ -139,27 +139,25 @@ def reset():
     data = request.get_json()
 
     if not data:
-        return jsonify({ "error": "Request body must be in JSON" }), 400
+        return response(400, "Request body must be in JSON")
 
     reset_token = data.get('reset_token')
     new_password = data.get('new_password')
 
     if not reset_token:
-        return jsonify({ "error": "Field 'reset_token' is required" }), 400
+        return response(400, "Field 'reset_token' is required")
     if not new_password:
-        return jsonify({ "error": "Field 'new_password' is required" }), 400
+        return response(400, "Field 'new_password' is required")
 
     # Validate password strength
     password_regex = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
     if not re.match(password_regex, new_password):
-        return jsonify({
-            "error": "Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, one number, and one special character"
-        }), 400
+        return response(400, "Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, one number, and one special character")
 
     # Check if the token exists and get the email
     token_entry = tokens_collection.find_one({ "token": reset_token })
     if not token_entry:
-        return jsonify({ "error": "Reset token provided is invalid" }), 400
+        return response(400, "Reset token provided is invalid")
 
     email = token_entry['email']
 
@@ -171,7 +169,7 @@ def reset():
     # Delete reset token as it has been used
     tokens_collection.delete_one({ "token": reset_token })
 
-    return jsonify({ "message": "Password reset successful" }), 200
+    return response(200, "Password reset successful")
 
 # ---------------------------------------------------------------------------- #
 # TODO: check
@@ -181,12 +179,12 @@ def change_password():
 
     # Ensure data exists in request
     if not data:
-        return jsonify({"error": "Request body must be JSON"}), 400
+        return response(400, "Request body must be JSON")
 
     # Extract JWT token and new password details
     token = request.headers.get('Authorization')
     if not token or not token.startswith("Bearer "):
-        return jsonify({"error": "Authorization token required"}), 401
+        return response(401, "Authorization token required")
     token = token.split(" ")[1]  # Remove 'Bearer ' prefix
 
     current_password = data.get('current_password')
@@ -195,40 +193,38 @@ def change_password():
 
     # Validate input
     if not current_password or not new_password or not confirm_password:
-        return jsonify({"error": "Current password, new password, and confirm password are required"}), 400
+        return response(400, "Current password, new password, and confirm password are required")
     if new_password != confirm_password:
-        return jsonify({"error": "New passwords do not match"}), 400
+        return response(400, "New passwords do not match")
 
     # Validate password strength (same as previous password pattern)
     password_regex = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
     if not re.match(password_regex, new_password):
-        return jsonify({
-            "error": "Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, one number, and one special character"
-        }), 400
+        return response(400, "Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, one number, and one special character")
 
     try:
         # Decode the JWT token to get the email
         decoded_token = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
         email = decoded_token['email']
     except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token has expired"}), 401
+        return response(401, "Token has expired")
     except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
+        return response(401, "Invalid token")
 
     # Fetch the user from the database using the decoded email
     user = users_collection.find_one({"email": email})
 
     if not user:
-        return jsonify({"error": "User not found"}), 404
+        return response(404, "User not found")
 
     # Check if the current password is correct
     if user['password'] != current_password:  # In production, compare hashed passwords
-        return jsonify({"error": "Current password is incorrect"}), 401
+        return response(401, "Current password is incorrect")
 
     # Update the user's password in the database
     users_collection.update_one({"email": email}, {"$set": {"password": new_password}})
 
-    return jsonify({"message": "Password updated successfully"}), 200
+    return response(200, "Password updated successfully")
 
 ################################################################################
 # --------------------------  Resume Related Routes -------------------------- #
@@ -236,7 +232,8 @@ def change_password():
 
 @app.route('/api/resumes/get_all', methods=['GET'])
 def get_all_resumes():
-    return json_util.dumps({ "data": resumes_collection.find() }), 200
+    resumes = list(resumes_collection.find())
+    return jsonify({ "data": resumes }), 200
 
 # ---------------------------------------------------------------------------- #
 
@@ -248,8 +245,11 @@ def get_total_resume_count():
 
 @app.route('/api/resumes/delete_by_id/<resume_id>', methods=['DELETE'])
 def delete_resume_by_id(resume_id):
-    resumes_collection.delete_one({ "_id": ObjectId(resume_id) })
-    return jsonify({ "message": "Resume deleted successfully" }), 200
+    try:
+        resumes_collection.delete_one({ "_id": ObjectId(resume_id) })
+        return response(200, "Resume deleted successfully")
+    except Exception as e:
+        return response(400, f"Invalid resume ID: {str(e)}")
 
 # ---------------------------------------------------------------------------- #
 
