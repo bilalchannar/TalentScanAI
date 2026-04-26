@@ -13,7 +13,7 @@
 		'/dash/manage': Manage,
 		'/dash/rank': Rank,
 		'/dash/support': Support,
-    }
+    };
 </script>
 
 <div class="container">

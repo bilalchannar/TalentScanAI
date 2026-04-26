@@ -13,7 +13,7 @@
 		'/auth/logout': Logout,
 		'/auth/reset': Reset,
 		'/auth/signup': Signup,
-    }
+    };
 </script>
 
 <div class="container">

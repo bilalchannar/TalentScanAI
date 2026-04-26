@@ -56,6 +56,7 @@
                     <td>C++, Java, Algorithms</td>
                     <td>80</td>
                     <td><button>View Reasoning</button></td>
+                </tr>
             </tbody>
         </table>
     </div>

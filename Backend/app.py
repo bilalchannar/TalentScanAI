@@ -6,7 +6,7 @@ from os import urandom
 from os import makedirs
 
 from flask_cors import CORS
-from bson import ObjectId;
+from bson import ObjectId
 from bson import json_util
 from uuid import uuid4
 from pymongo import MongoClient

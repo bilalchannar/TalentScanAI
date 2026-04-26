@@ -6,9 +6,7 @@
     let password = '';
     let confirmPassword = '';
 
-    async function signup(event) {
-        event.preventDefault();
-        
+    async function signup() {
         // Validate passwords match
         if (password !== confirmPassword) {
             alert("Passwords don't match!");
@@ -43,7 +41,7 @@
 <p>Sign Up and Unlock Smarter Hiring</p>
 <div class="main-content">
     <section class="signup-section">
-        <form on:submit={signup}>
+        <form on:submit|preventDefault={signup}>
             <input 
                 type="text" 
                 bind:value={name}
