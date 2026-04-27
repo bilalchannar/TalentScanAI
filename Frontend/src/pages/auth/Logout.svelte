@@ -2,9 +2,10 @@
     import { replace } from 'svelte-spa-router';
     import { onMount } from 'svelte';
     import { notify } from '../../notificationStore.js';
+    import { clearAuthStorage } from '../../api.js';
 
     onMount(() => {
-        localStorage.clear(); // Wipe everything
+        clearAuthStorage();
         notify("Logged out successfully", "success");
         replace('/auth/login');
     });

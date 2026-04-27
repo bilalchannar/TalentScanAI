@@ -3,25 +3,25 @@
     import { replace } from 'svelte-spa-router';
     import { notify } from '../../notificationStore.js';
     import { fade } from 'svelte/transition';
+    import { withApiBase } from '../../api.js';
 
     let email = '';
     let password = '';
-    let role = 'candidate'; // Visual role selection
+    let role = 'candidate';
 
     async function login() {
         try {
-            const response = await fetch('http://127.0.0.1:3000/api/auth/login', {
+            const response = await fetch(withApiBase('/api/auth/login'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, role }),
             });
 
             const { data, message } = await response.json();
             
             if(response.status === 200) {
-                // The actual role is coming from the DB, but we use the selection for UI feel
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('role', data.role);
                 localStorage.setItem('name', data.name);

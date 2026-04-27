@@ -4,9 +4,9 @@
     import { fade, fly } from 'svelte/transition';
     import { push } from 'svelte-spa-router';
     import { reasoningReport } from '../../reasoningStore.js';
+    import { apiFetch, withApiBase } from '../../api.js';
 
     let userRole = localStorage.getItem('role') || 'candidate';
-    let userName = localStorage.getItem('name') || 'User';
 
     let jobDescription = '';
     let results = [];
@@ -21,26 +21,24 @@
 
         isRanking = true;
         try {
-            const endpoint = userRole === 'recruiter' 
-                ? 'http://127.0.0.1:3000/api/resumes/rank'
-                : 'http://127.0.0.1:3000/api/resumes/rank'; // We use the same but filter in UI
-            
-            const res = await fetch(endpoint, {
+            const res = await apiFetch('/api/resumes/rank', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ job_description: jobDescription })
             });
+
+            if (res.status === 401) {
+                notify('Session expired. Please login again.', 'error');
+                push('/auth/login');
+                return;
+            }
+
             const result = await res.json();
             
             if (result.success) {
-                if (userRole === 'recruiter') {
-                    results = result.data || [];
-                } else {
-                    // CANDIDATE: Only show their OWN result
-                    results = (result.data || []).filter(r => r.name.toLowerCase().includes(userName.toLowerCase()));
-                }
+                results = result.data || [];
                 notify(userRole === 'recruiter' ? 'Ranking complete!' : 'Analysis complete!', 'success');
             } else {
                 notify(result.message, 'error');
@@ -54,7 +52,8 @@
     }
 
     function viewPdf(filename) {
-        selectedPdf = `http://127.0.0.1:3000/api/resumes/view/${filename}`;
+        const token = localStorage.getItem('token') || '';
+        selectedPdf = withApiBase(`/api/resumes/view/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`);
     }
 
     function showReasoning(result) {
@@ -123,8 +122,24 @@
     {/if}
 
     {#if selectedPdf}
-        <div class="modal-overlay" on:click={() => selectedPdf = null}>
-            <div class="modal-content" on:click|stopPropagation>
+        <div
+            class="modal-overlay"
+            role="button"
+            tabindex="0"
+            on:click={() => selectedPdf = null}
+            on:keydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    selectedPdf = null;
+                }
+            }}
+        >
+            <div
+                class="modal-content"
+                role="presentation"
+                tabindex="-1"
+                on:click|stopPropagation
+                on:keydown|stopPropagation={() => {}}
+            >
                 <div class="modal-header">
                     <h3>Resume Preview</h3>
                     <button class="close-btn" on:click={() => selectedPdf = null}>&times;</button>

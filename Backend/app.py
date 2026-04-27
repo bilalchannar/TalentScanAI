@@ -2,14 +2,16 @@ import re
 import jwt
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from os import environ, urandom, makedirs
+from functools import wraps
 from flask_cors import CORS
 from bson import ObjectId
 from bson import json_util
+from bson.errors import InvalidId
 from uuid import uuid4
 from pymongo import MongoClient
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, g
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import PyPDF2
@@ -22,8 +24,30 @@ from sklearn.metrics.pairwise import cosine_similarity
 ################################################################################
 
 app = Flask(__name__)
-CORS(app)
-JWT_SECRET_KEY = urandom(32).hex()
+
+cors_origins_env = environ.get("CORS_ALLOWED_ORIGINS", "")
+if cors_origins_env:
+    allowed_cors_origins = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+else:
+    allowed_cors_origins = [
+        "http://127.0.0.1:5000",
+        "http://localhost:5000",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173"
+    ]
+
+CORS(app, resources={r"/api/*": {"origins": allowed_cors_origins}})
+
+JWT_SECRET_KEY = environ.get("JWT_SECRET_KEY") or urandom(32).hex()
+JWT_EXP_MINUTES = max(5, int(environ.get("JWT_EXP_MINUTES", "120")))
+RESET_TOKEN_EXP_MINUTES = max(5, int(environ.get("RESET_TOKEN_EXP_MINUTES", "15")))
+ALLOW_PUBLIC_RECRUITER_SIGNUP = environ.get("ALLOW_PUBLIC_RECRUITER_SIGNUP", "false").lower() == "true"
+EXPOSE_RESET_TOKEN = environ.get("EXPOSE_RESET_TOKEN", "false").lower() == "true"
+FLASK_DEBUG_ENABLED = environ.get("FLASK_DEBUG", "false").lower() == "true"
+ALLOWED_ROLES = {"candidate", "recruiter"}
+
+if not environ.get("JWT_SECRET_KEY"):
+    print("WARNING: JWT_SECRET_KEY is not set. Tokens will be invalidated on server restart.")
 
 RESUMES_UPLOAD_FOLDER = 'static/resumes'
 makedirs(RESUMES_UPLOAD_FOLDER, exist_ok=True)
@@ -45,17 +69,89 @@ GLOBAL_TECH_KEYWORDS = {
 @app.errorhandler(Exception)
 def handle_exception(e):
     print(f"ERROR: {e}")
-    return response(500, str(e))
+    if FLASK_DEBUG_ENABLED:
+        return response(500, str(e))
+    return response(500, "Internal server error")
 
 users_collection = db['users']
 resumes_collection = db['resumes']
 tokens_collection = db['reset_tokens']
+jobs_collection = db['jobs']
+applications_collection = db['applications']
 
 def response(code, message, data=None):
-    # Ensure data is JSON serializable (handle MongoDB ObjectIds)
+    # Ensure data is JSON serializable (handle MongoDB ObjectIds and Datetimes)
     if data is not None:
-        data = json.loads(json_util.dumps(data))
+        # json_util.dumps creates {"$date": ...} objects
+        # We want to flatten these or ensure they are ISO strings
+        data_json = json_util.dumps(data)
+        data = json.loads(data_json)
+        
+        # Helper to recursively fix $date and $oid
+        def flatten_mongo(obj):
+            if isinstance(obj, list):
+                return [flatten_mongo(item) for item in obj]
+            if isinstance(obj, dict):
+                if "$date" in obj:
+                    # Handle both numeric and string formats from json_util
+                    val = obj["$date"]
+                    if isinstance(val, dict) and "$numberLong" in val:
+                        return datetime.fromtimestamp(int(val["$numberLong"])/1000).isoformat()
+                    return val if isinstance(val, str) else datetime.fromtimestamp(val/1000).isoformat()
+                if "$oid" in obj:
+                    return obj["$oid"]
+                return {k: flatten_mongo(v) for k, v in obj.items()}
+            return obj
+            
+        data = flatten_mongo(data)
+        
     return jsonify({ "data": data, "message": message, "success": (code >= 200 and code <= 299) }), code
+
+def get_bearer_token():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith("Bearer "):
+        token_from_query = request.args.get('token', '').strip()
+        return token_from_query if token_from_query else None
+    return auth_header.split(" ", 1)[1].strip()
+
+def get_authenticated_user(required_roles=None):
+    token = get_bearer_token()
+    if not token:
+        return None, response(401, "Authorization token required")
+
+    try:
+        decoded_token = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return None, response(401, "Token has expired")
+    except jwt.InvalidTokenError:
+        return None, response(401, "Invalid token")
+
+    email = decoded_token.get('email')
+    if not email:
+        return None, response(401, "Invalid token payload")
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        return None, response(401, "User not found")
+
+    user_role = user.get("role", "candidate")
+    if required_roles and user_role not in required_roles:
+        return None, response(403, "Access denied")
+
+    return user, None
+
+def auth_required(required_roles=None):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            user, auth_error = get_authenticated_user(required_roles)
+            if auth_error:
+                return auth_error
+
+            g.current_user = user
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 ################################################################################
 # ---------------------------  Auth Related Routes --------------------------- #
@@ -70,9 +166,12 @@ def login():
 
     email = data.get("email")
     password = data.get("password")
+    selected_role = str(data.get("role", "")).strip().lower()
 
     if not email or not password:
         return response(400, "Fields 'email' and 'password' are required")
+    if selected_role and selected_role not in ALLOWED_ROLES:
+        return response(400, f"Role must be one of: {', '.join(sorted(ALLOWED_ROLES))}")
 
     # Fetch user from the database
     user = users_collection.find_one({ "email": email })
@@ -80,13 +179,25 @@ def login():
     if not user or not check_password_hash(user["password"], password):
         return response(400, "Invalid email or password")
 
-    # Generate JWT token
-    token = jwt.encode({ "email": email }, JWT_SECRET_KEY, algorithm="HS256")
+    user_role = user.get("role", "candidate")
+    if selected_role and selected_role != user_role:
+        return response(403, f"Role mismatch: this account is registered as {user_role}")
+
+    now_utc = datetime.utcnow()
+
+    # Generate JWT token with role and expiration claims
+    token_payload = {
+        "email": email,
+        "role": user_role,
+        "iat": now_utc,
+        "exp": now_utc + timedelta(minutes=JWT_EXP_MINUTES)
+    }
+    token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm="HS256")
 
     # Return the token, email, and role to the client
     return response(200, "Login successful", { 
         "token": token, 
-        "role": user.get("role", "candidate"),
+        "role": user_role,
         "name": user.get("name"),
         "email": email
     })
@@ -103,7 +214,7 @@ def signup():
     name = data.get('name')
     email = data.get('email')
     password = data.get('password')
-    role = data.get('role', 'candidate') # Default to candidate
+    role = str(data.get('role', 'candidate')).strip().lower()
 
     if not name:
         return response(400, "Field 'name' is required")
@@ -111,6 +222,10 @@ def signup():
         return response(400, "Field 'email' is required")
     if not password:
         return response(400, "Field 'password' is required")
+    if role not in ALLOWED_ROLES:
+        return response(400, f"Role must be one of: {', '.join(sorted(ALLOWED_ROLES))}")
+    if role == "recruiter" and not ALLOW_PUBLIC_RECRUITER_SIGNUP:
+        return response(403, "Recruiter signup is disabled. Contact an administrator")
 
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     if not re.match(email_regex, email):
@@ -151,16 +266,25 @@ def forgot():
         return response(400, "Email field is required")
 
     user = users_collection.find_one({ "email": email })
+    generic_message = "If the account exists, a reset token has been generated"
     if not user:
-        return response(400, "No such user found")
+        return response(200, generic_message)
 
     # Generate a unique reset token
     reset_token = str(uuid4())
-    tokens_collection.insert_one({ "email": email, "token": reset_token })
+    now_utc = datetime.utcnow()
+    tokens_collection.delete_many({ "email": email })
+    tokens_collection.insert_one({
+        "email": email,
+        "token": reset_token,
+        "created_at": now_utc,
+        "expires_at": now_utc + timedelta(minutes=RESET_TOKEN_EXP_MINUTES)
+    })
 
     # TODO: send token via email
-
-    return response(200, "Password reset token generated", { "reset_token": reset_token })
+    if EXPOSE_RESET_TOKEN:
+        return response(200, generic_message, { "reset_token": reset_token })
+    return response(200, generic_message)
 
 # ---------------------------------------------------------------------------- #
 # TODO: check
@@ -187,9 +311,19 @@ def reset():
     # Check if the token exists and get the email
     token_entry = tokens_collection.find_one({ "token": reset_token })
     if not token_entry:
-        return response(400, "Reset token provided is invalid")
+        return response(400, "Reset token is invalid or expired")
+
+    expires_at = token_entry.get("expires_at")
+    if expires_at and expires_at < datetime.utcnow():
+        tokens_collection.delete_one({"_id": token_entry["_id"]})
+        return response(400, "Reset token is invalid or expired")
 
     email = token_entry['email']
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        tokens_collection.delete_one({"_id": token_entry["_id"]})
+        return response(400, "Reset token is invalid or expired")
 
     # Update the user's password (hashed)
     users_collection.update_one({ "email": email }, {
@@ -197,7 +331,7 @@ def reset():
     })
 
     # Delete reset token as it has been used
-    tokens_collection.delete_one({ "token": reset_token })
+    tokens_collection.delete_one({"_id": token_entry["_id"]})
 
     return response(200, "Password reset successful")
 
@@ -210,11 +344,9 @@ def change_password():
     if not data:
         return response(400, "Request body must be JSON")
 
-    # Extract JWT token from Authorization header
-    token = request.headers.get('Authorization')
-    if not token or not token.startswith("Bearer "):
-        return response(401, "Authorization token required")
-    token = token.split(" ")[1]  # Remove 'Bearer ' prefix
+    user, auth_error = get_authenticated_user()
+    if auth_error:
+        return auth_error
 
     current_password = data.get('current_password')
     new_password = data.get('new_password')
@@ -231,51 +363,88 @@ def change_password():
     if not re.match(password_regex, new_password):
         return response(400, "Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, one number, and one special character")
 
-    try:
-        # Decode the JWT token to get the email
-        decoded_token = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
-        email = decoded_token['email']
-    except jwt.ExpiredSignatureError:
-        return response(401, "Token has expired")
-    except jwt.InvalidTokenError:
-        return response(401, "Invalid token")
-
-    # Fetch the user from the database using the decoded email
-    user = users_collection.find_one({"email": email})
-
-    if not user:
-        return response(404, "User not found")
-
     # Check if the current password is correct (compare against hashed password)
     if not check_password_hash(user['password'], current_password):
         return response(401, "Current password is incorrect")
 
     # Update the user's password in the database (store hashed)
-    users_collection.update_one({"email": email}, {"$set": {"password": generate_password_hash(new_password)}})
+    users_collection.update_one({"email": user["email"]}, {"$set": {"password": generate_password_hash(new_password)}})
 
     return response(200, "Password updated successfully")
+
+@app.route('/api/auth/update_profile', methods=['POST'])
+@auth_required()
+def update_profile():
+    data = request.get_json()
+    new_name = data.get('name')
+    new_email = data.get('email')
+    
+    if not new_name or not new_email:
+        return response(400, "Name and email are required")
+        
+    users_collection.update_one(
+        {"email": g.current_user.get("email")},
+        {"$set": {"name": new_name, "email": new_email}}
+    )
+    return response(200, "Profile updated successfully")
+
+@app.route('/api/support/ticket', methods=['POST'])
+@auth_required()
+def create_ticket():
+    data = request.get_json()
+    subject = data.get('subject')
+    message = data.get('message')
+    
+    if not message:
+        return response(400, "Message is required")
+        
+    # In a real app, we'd save this to a tickets collection
+    # For now, we'll just log it
+    print(f"SUPPORT TICKET from {g.current_user.get('email')}: {subject} - {message}")
+    
+    return response(201, "Support ticket created successfully")
 
 ################################################################################
 # --------------------------  Resume Related Routes -------------------------- #
 ################################################################################
 
 @app.route('/api/resumes/get_all', methods=['GET'])
+@auth_required(required_roles={"recruiter"})
 def get_all_resumes():
-    from flask import Response
-    return Response(json_util.dumps({ "data": list(resumes_collection.find()) }), status=200, mimetype='application/json')
+    resumes = list(resumes_collection.find())
+    for resume in resumes:
+        resume['_id'] = str(resume['_id'])
+    return response(200, "Resumes fetched", resumes)
 
 # ---------------------------------------------------------------------------- #
 
 @app.route('/api/resumes/total_count', methods=['GET'])
+@auth_required(required_roles={"recruiter"})
 def get_total_resume_count():
-    return jsonify({ "data": resumes_collection.count_documents({}) }), 200
+    total_count = resumes_collection.count_documents({})
+    return response(200, "Total resume count fetched", total_count)
 
 # ---------------------------------------------------------------------------- #
 
 @app.route('/api/resumes/delete_by_id/<resume_id>', methods=['DELETE'])
+@auth_required()
 def delete_resume_by_id(resume_id):
-    resumes_collection.delete_one({ "_id": ObjectId(resume_id) })
-    return jsonify({ "message": "Resume deleted successfully" }), 200
+    try:
+        resume_object_id = ObjectId(resume_id)
+    except InvalidId:
+        return response(400, "Invalid resume id")
+
+    resume = resumes_collection.find_one({"_id": resume_object_id})
+    if not resume:
+        return response(404, "Resume not found")
+
+    current_user = g.current_user
+    current_role = current_user.get("role", "candidate")
+    if current_role != "recruiter" and resume.get("owner_email") != current_user.get("email"):
+        return response(403, "You can only delete your own resume")
+
+    resumes_collection.delete_one({"_id": resume_object_id})
+    return response(200, "Resume deleted successfully")
 
 # ---------------------------------------------------------------------------- #
 
@@ -322,21 +491,38 @@ def extract_skills(text):
     return found
 
 @app.route('/api/resumes/view/<filename>')
+@auth_required()
 def view_resume(filename):
+    resume = resumes_collection.find_one({"filename": filename})
+    if not resume:
+        return response(404, "Resume not found")
+
+    current_user = g.current_user
+    current_role = current_user.get("role", "candidate")
+    if current_role != "recruiter" and resume.get("owner_email") != current_user.get("email"):
+        return response(403, "You can only view your own resume")
+
     return send_from_directory(RESUMES_UPLOAD_FOLDER, filename)
 
 @app.route('/api/resumes/upload', methods=['POST'])
+@auth_required()
 def upload_resume():
     if 'file' not in request.files:
         return response(400, "No file part")
     
+    current_user = g.current_user
     file = request.files['file']
-    owner_email = request.form.get('owner_email', 'anonymous')
+    owner_email = current_user.get("email")
+
+    if current_user.get("role") == "recruiter":
+        requested_owner_email = request.form.get('owner_email', '').strip()
+        if requested_owner_email:
+            owner_email = requested_owner_email
     
     if file.filename == '':
         return response(400, "No selected file")
     
-    if file and file.filename.endswith('.pdf'):
+    if file and file.filename.lower().endswith('.pdf'):
         original_filename = secure_filename(file.filename)
         unique_filename = f"{uuid4()}_{original_filename}"
         file_path = os.path.join(RESUMES_UPLOAD_FOLDER, unique_filename)
@@ -355,6 +541,7 @@ def upload_resume():
         resume_data = {
             "name": candidate_name,
             "owner_email": owner_email, # Link to account
+            "uploaded_by": current_user.get("email"),
             "filename": unique_filename,
             "original_filename": original_filename,
             "path": file_path,
@@ -369,15 +556,20 @@ def upload_resume():
     return response(400, "Invalid file format. Only PDFs are allowed.")
 
 @app.route('/api/resumes/list', methods=['GET'])
+@auth_required()
 def list_resumes():
-    owner_email = request.args.get('owner_email')
-    
-    # If email provided, filter by it (Candidate mode)
-    if owner_email:
-        resumes = list(resumes_collection.find({"owner_email": owner_email}))
+    current_user = g.current_user
+    current_role = current_user.get("role", "candidate")
+
+    query = {}
+    if current_role == "recruiter":
+        owner_email = request.args.get('owner_email')
+        if owner_email:
+            query["owner_email"] = owner_email
     else:
-        # No email = Recruiter mode (See all)
-        resumes = list(resumes_collection.find())
+        query["owner_email"] = current_user.get("email")
+
+    resumes = list(resumes_collection.find(query))
         
     for r in resumes:
         r['_id'] = str(r['_id'])
@@ -396,14 +588,21 @@ def clean_text(text):
     return text
 
 @app.route('/api/resumes/rank', methods=['POST'])
+@auth_required()
 def rank_resumes():
-    data = request.get_json()
+    data = request.get_json() or {}
     job_description = data.get('job_description')
 
     if not job_description:
         return response(400, "Job description is required")
 
-    resumes = list(resumes_collection.find())
+    current_user = g.current_user
+    current_role = current_user.get("role", "candidate")
+    query = {}
+    if current_role != "recruiter":
+        query["owner_email"] = current_user.get("email")
+
+    resumes = list(resumes_collection.find(query))
     if not resumes:
         return response(200, "No resumes to rank", [])
 
@@ -482,9 +681,16 @@ def rank_resumes():
         return response(500, f"Internal error during ranking: {str(e)}")
 
 @app.route('/api/stats', methods=['GET'])
+@auth_required(required_roles={"recruiter"})
 def get_stats():
     resumes = list(resumes_collection.find())
     total_resumes = len(resumes)
+    
+    # Active Jobs count
+    total_jobs = jobs_collection.count_documents({})
+    
+    # Total Applications count
+    total_apps = applications_collection.count_documents({})
     
     # Calculate top skills
     all_skills = []
@@ -494,18 +700,19 @@ def get_stats():
     from collections import Counter
     skill_counts = Counter(all_skills).most_common(5)
     
-    # Recent activity (last 7 days - simplified for now)
-    # We'll just return the count for the last 5 uploads
+    # Recent activity
     recent_uploads = []
     sorted_resumes = sorted(resumes, key=lambda x: x.get('uploaded_at', datetime.min), reverse=True)
     for r in sorted_resumes[:5]:
         recent_uploads.append({
-            "name": r.get('name'),
-            "date": r.get('uploaded_at').strftime("%Y-%m-%d") if r.get('uploaded_at') else "Unknown"
+            "name": r.get('name', 'Anonymous'),
+            "date": r.get('uploaded_at').strftime("%Y-%m-%d") if r.get('uploaded_at') and isinstance(r.get('uploaded_at'), datetime) else "Recently"
         })
 
     stats_data = {
         "total_resumes": total_resumes,
+        "total_jobs": total_jobs,
+        "total_applications": total_apps,
         "top_skills": [{"skill": s, "count": c} for s, c in skill_counts],
         "recent_activity": recent_uploads,
         "total_skills_found": len(set(all_skills))
@@ -513,6 +720,106 @@ def get_stats():
     
     return response(200, "Stats fetched successfully", stats_data)
 
+# ################################################################################
+# # ---------------------------  Job Related Routes --------------------------- #
+# ################################################################################
+
+@app.route('/api/jobs/create', methods=['POST'])
+@auth_required(required_roles={"recruiter"})
+def create_job():
+    data = request.get_json()
+    if not data:
+        return response(400, "Invalid JSON")
+    
+    title = data.get('title')
+    company = data.get('company')
+    description = data.get('description')
+    location = data.get('location', 'Remote')
+    
+    if not title or not description:
+        return response(400, "Title and description are required")
+    
+    job_data = {
+        "title": title,
+        "company": company or "TalentScan Partner",
+        "description": description,
+        "location": location,
+        "posted_by": g.current_user.get("email"),
+        "created_at": datetime.utcnow()
+    }
+    
+    result = jobs_collection.insert_one(job_data)
+    return response(201, "Job posted successfully", {"id": str(result.inserted_id)})
+
+@app.route('/api/jobs/list', methods=['GET'])
+def list_jobs():
+    jobs = list(jobs_collection.find().sort("created_at", -1))
+    for j in jobs:
+        j['_id'] = str(j['_id'])
+    return response(200, "Jobs fetched", jobs)
+
+@app.route('/api/jobs/apply', methods=['POST'])
+@auth_required(required_roles={"candidate"})
+def apply_to_job():
+    data = request.get_json()
+    job_id = data.get('job_id')
+    resume_id = data.get('resume_id')
+    
+    if not job_id or not resume_id:
+        return response(400, "Job ID and Resume ID are required")
+    
+    try:
+        job_oid = ObjectId(job_id)
+        resume_oid = ObjectId(resume_id)
+    except:
+        return response(400, "Invalid ID format")
+    
+    job = jobs_collection.find_one({"_id": job_oid})
+    if not job:
+        return response(404, "Job not found")
+        
+    resume = resumes_collection.find_one({"_id": resume_oid, "owner_email": g.current_user.get("email")})
+    if not resume:
+        return response(404, "Resume not found or access denied")
+    
+    # Check if already applied
+    existing = applications_collection.find_one({
+        "job_id": str(job_oid),
+        "candidate_email": g.current_user.get("email")
+    })
+    if existing:
+        return response(400, "You have already applied for this job")
+    
+    application = {
+        "job_id": str(job_oid),
+        "job_title": job.get("title"),
+        "candidate_name": g.current_user.get("name"),
+        "candidate_email": g.current_user.get("email"),
+        "resume_id": str(resume_oid),
+        "resume_name": resume.get("original_filename"),
+        "status": "pending",
+        "applied_at": datetime.utcnow()
+    }
+    
+    applications_collection.insert_one(application)
+    return response(201, "Application submitted successfully")
+
+@app.route('/api/jobs/my_applications', methods=['GET'])
+@auth_required(required_roles={"candidate"})
+def my_applications():
+    apps = list(applications_collection.find({"candidate_email": g.current_user.get("email")}))
+    for a in apps:
+        a['_id'] = str(a['_id'])
+    return response(200, "Applications fetched", apps)
+
+@app.route('/api/jobs/recruiter_applications', methods=['GET'])
+@auth_required(required_roles={"recruiter"})
+def recruiter_applications():
+    apps = list(applications_collection.find().sort("applied_at", -1))
+    for a in apps:
+        a['_id'] = str(a['_id'])
+    return response(200, "Applications fetched", apps)
+
 # ---------------------------------------------------------------------------- #
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=3000, debug=True)
+    app.run(host="0.0.0.0", port=3000, debug=FLASK_DEBUG_ENABLED)

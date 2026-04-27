@@ -1,10 +1,13 @@
 <script>
+    import { onMount } from 'svelte';
+    import { push } from 'svelte-spa-router';
     import { notify } from '../../notificationStore.js';
     import { fade } from 'svelte/transition';
+    import { apiFetch, getToken } from '../../api.js';
 
     let profile = {
-        name: 'Bilal Tariq',
-        email: 'bilalchannar01@gmail.com'
+        name: 'User',
+        email: ''
     };
 
     let passwordData = {
@@ -19,17 +22,80 @@
         darkMode: localStorage.getItem('theme') === 'dark'
     };
 
-    function saveProfile() {
-        notify("Profile updated successfully", "success");
+    onMount(() => {
+        if (!getToken()) {
+            push('/auth/login');
+            return;
+        }
+
+        profile = {
+            name: localStorage.getItem('name') || 'User',
+            email: localStorage.getItem('email') || ''
+        };
+    });
+
+    async function saveProfile() {
+        try {
+            const res = await apiFetch('/api/auth/update_profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: profile.name, email: profile.email })
+            });
+            const result = await res.json();
+            if (result.success) {
+                localStorage.setItem('name', profile.name);
+                localStorage.setItem('email', profile.email);
+                notify("Profile updated successfully", "success");
+            } else {
+                notify(result.message || "Failed to update profile", "error");
+            }
+        } catch (err) {
+            notify("Connection error", "error");
+        }
     }
 
-    function changePassword() {
+    async function changePassword() {
+        if (!passwordData.current || !passwordData.new || !passwordData.confirm) {
+            notify("All password fields are required", "error");
+            return;
+        }
+
         if (passwordData.new !== passwordData.confirm) {
             notify("Passwords do not match", "error");
             return;
         }
-        notify("Password changed securely", "success");
-        passwordData = { current: '', new: '', confirm: '' };
+
+        try {
+            const res = await apiFetch('/api/auth/change', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    current_password: passwordData.current,
+                    new_password: passwordData.new,
+                    confirm_password: passwordData.confirm
+                })
+            });
+
+            if (res.status === 401) {
+                notify('Session expired. Please login again', 'error');
+                push('/auth/login');
+                return;
+            }
+
+            const result = await res.json();
+            if (result.success) {
+                notify("Password changed securely", "success");
+                passwordData = { current: '', new: '', confirm: '' };
+                return;
+            }
+
+            notify(result.message || 'Failed to update password', 'error');
+        } catch (error) {
+            console.error('Change password error:', error);
+            notify('An error occurred while changing password', 'error');
+        }
     }
 
     function toggleDarkMode() {
@@ -57,12 +123,12 @@
             </div>
 
             <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" bind:value={profile.name} placeholder="Your Name" />
+                <label for="profileName">Full Name</label>
+                <input id="profileName" type="text" bind:value={profile.name} placeholder="Your Name" />
             </div>
             <div class="form-group">
-                <label>Email Address</label>
-                <input type="email" bind:value={profile.email} placeholder="Email" />
+                <label for="profileEmail">Email Address</label>
+                <input id="profileEmail" type="email" bind:value={profile.email} placeholder="Email" />
             </div>
             <button class="primary-btn" on:click={saveProfile}>Save Changes</button>
         </div>
@@ -73,16 +139,16 @@
             <p class="section-desc">Update your password and secure your account.</p>
 
             <div class="form-group">
-                <label>Current Password</label>
-                <input type="password" bind:value={passwordData.current} placeholder="••••••••" />
+                <label for="currentPassword">Current Password</label>
+                <input id="currentPassword" type="password" bind:value={passwordData.current} placeholder="••••••••" />
             </div>
             <div class="form-group">
-                <label>New Password</label>
-                <input type="password" bind:value={passwordData.new} placeholder="New Password" />
+                <label for="newPassword">New Password</label>
+                <input id="newPassword" type="password" bind:value={passwordData.new} placeholder="New Password" />
             </div>
             <div class="form-group">
-                <label>Confirm Password</label>
-                <input type="password" bind:value={passwordData.confirm} placeholder="Confirm New Password" />
+                <label for="confirmNewPassword">Confirm Password</label>
+                <input id="confirmNewPassword" type="password" bind:value={passwordData.confirm} placeholder="Confirm New Password" />
             </div>
             <button class="secondary-btn" on:click={changePassword}>Update Password</button>
         </div>

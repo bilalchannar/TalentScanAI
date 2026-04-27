@@ -3,6 +3,7 @@
     import { replace } from 'svelte-spa-router';
 
     import { notify } from '../../notificationStore.js';
+    import { withApiBase } from '../../api.js';
 
     let email = '';
 
@@ -12,7 +13,7 @@
             return;
         }
         try {
-            const res = await fetch('http://127.0.0.1:3000/api/auth/forgot', {
+            const res = await fetch(withApiBase('/api/auth/forgot'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),

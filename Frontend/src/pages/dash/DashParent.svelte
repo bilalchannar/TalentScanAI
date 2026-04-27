@@ -1,7 +1,8 @@
 <script>
-    import Router, { location } from 'svelte-spa-router';
+    import Router, { location, replace } from 'svelte-spa-router';
     import ThemeToggle from '../../components/ThemeToggle.svelte';
     import { onMount } from 'svelte';
+    import { getToken } from '../../api.js';
 
     import Change from "./Change.svelte";
 	import Education from "./Education.svelte";
@@ -10,12 +11,20 @@
 	import Support from "./Support.svelte";
 	import Stats from "./Stats.svelte";
     import Reasoning from "./Reasoning.svelte";
+    import PostJob from "./PostJob.svelte";
+    import JobFeed from "./JobFeed.svelte";
+    import Applications from "./Applications.svelte";
 
     let userRole = 'candidate';
     let userName = 'User';
     let userEmail = '';
 
     onMount(() => {
+        if (!getToken()) {
+            replace('/auth/login');
+            return;
+        }
+
         userRole = localStorage.getItem('role') || 'candidate';
         userName = localStorage.getItem('name') || 'User';
         userEmail = localStorage.getItem('email') || '';
@@ -28,7 +37,10 @@
 		'/dash/rank': Rank,
 		'/dash/support': Support,
         '/dash/stats': Stats,
-        '/dash/reasoning': Reasoning
+        '/dash/reasoning': Reasoning,
+        '/dash/post-job': PostJob,
+        '/dash/job-feed': JobFeed,
+        '/dash/applications': Applications
     }
 
     $: isActive = (path) => $location === path;
@@ -59,6 +71,16 @@
                             </a>
                         </li>
                         <li>
+                            <a href="/#/dash/post-job" class:active={isActive('/dash/post-job')}>
+                                <span class="nav-icon">➕</span> Post Job
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/#/dash/applications" class:active={isActive('/dash/applications')}>
+                                <span class="nav-icon">📨</span> Applications
+                            </a>
+                        </li>
+                        <li>
                             <a href="/#/dash/rank" class:active={isActive('/dash/rank')}>
                                 <span class="nav-icon">📊</span> AI Ranking
                             </a>
@@ -71,12 +93,17 @@
                     {:else}
                         <li>
                             <a href="/#/dash/manage" class:active={isActive('/dash/manage')}>
-                                <span class="nav-icon">📄</span> My Application
+                                <span class="nav-icon">📄</span> My Profile
                             </a>
                         </li>
                         <li>
-                            <a href="/#/dash/rank" class:active={isActive('/dash/rank')}>
-                                <span class="nav-icon">💼</span> Job Feed
+                            <a href="/#/dash/job-feed" class:active={isActive('/dash/job-feed')}>
+                                <span class="nav-icon">💼</span> Find Jobs
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/#/dash/applications" class:active={isActive('/dash/applications')}>
+                                <span class="nav-icon">📤</span> My Applications
                             </a>
                         </li>
                     {/if}
@@ -115,7 +142,8 @@
                      isActive('/dash/change') ? 'Account Settings' : 'Recruiter Dashboard'}
                 {:else}
                     {isActive('/dash/manage') ? 'My Professional Profile' : 
-                     isActive('/dash/rank') ? 'Discover Opportunities' : 
+                     isActive('/dash/job-feed') ? 'Discover Opportunities' : 
+                     isActive('/dash/applications') ? 'Application History' : 
                      isActive('/dash/change') ? 'Account Settings' : 'Candidate Portal'}
                 {/if}
             </h2>
@@ -141,10 +169,20 @@
     padding: 30px 20px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     position: fixed;
     height: 100%;
     z-index: 100;
+}
+
+.top-section {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    /* Hide scrollbar but allow scrolling */
+    scrollbar-width: none;
+}
+.top-section::-webkit-scrollbar {
+    display: none;
 }
 
 .logo {
@@ -246,9 +284,11 @@ nav ul li a.active {
 }
 
 .bottom-section {
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
 }
 
 .logout-btn {

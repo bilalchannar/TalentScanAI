@@ -3,6 +3,7 @@
     import { replace } from 'svelte-spa-router';
     import { notify } from '../../notificationStore.js';
     import { fade } from 'svelte/transition';
+    import { withApiBase } from '../../api.js';
     
     let name = '';
     let email = '';
@@ -19,7 +20,7 @@
         }
 
         try {
-            const response = await fetch('http://127.0.0.1:3000/api/auth/signup', {
+            const response = await fetch(withApiBase('/api/auth/signup'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -69,23 +70,23 @@
 
             <form on:submit={signup}>
                 <div class="input-group">
-                    <label>Full Name</label>
-                    <input type="text" bind:value={name} placeholder="e.g. Bilal Tariq" required>
+                    <label for="fullName">Full Name</label>
+                    <input id="fullName" type="text" bind:value={name} placeholder="e.g. Bilal Tariq" required>
                 </div>
                 
                 <div class="input-group">
-                    <label>Email Address</label>
-                    <input type="email" bind:value={email} placeholder="email@example.com" required>
+                    <label for="signupEmail">Email Address</label>
+                    <input id="signupEmail" type="email" bind:value={email} placeholder="email@example.com" required>
                 </div>
 
                 <div class="input-group">
-                    <label>Password</label>
-                    <input type="password" bind:value={password} placeholder="Create a strong password" required>
+                    <label for="signupPassword">Password</label>
+                    <input id="signupPassword" type="password" bind:value={password} placeholder="Create a strong password" required>
                 </div>
 
                 <div class="input-group">
-                    <label>Confirm Password</label>
-                    <input type="password" bind:value={confirmPassword} placeholder="Repeat password" required>
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input id="confirmPassword" type="password" bind:value={confirmPassword} placeholder="Repeat password" required>
                 </div>
 
                 <button type="submit" class="submit-btn">Get Started</button>

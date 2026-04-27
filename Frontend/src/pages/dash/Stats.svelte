@@ -4,11 +4,14 @@
     import { notify } from '../../notificationStore.js';
     import StatsCard from '../../components/StatsCard.svelte';
     import { fade, fly } from 'svelte/transition';
+    import { apiFetch } from '../../api.js';
 
     let userRole = localStorage.getItem('role') || 'candidate';
 
     let stats = {
         total_resumes: 0,
+        total_jobs: 0,
+        total_applications: 0,
         top_skills: [],
         recent_activity: [],
         total_skills_found: 0
@@ -22,10 +25,25 @@
         }
 
         try {
-            const res = await fetch('http://127.0.0.1:3000/api/stats');
+            const res = await apiFetch('/api/stats');
+
+            if (res.status === 401) {
+                notify('Session expired. Please login again', 'error');
+                push('/auth/login');
+                return;
+            }
+
+            if (res.status === 403) {
+                notify('Access denied', 'error');
+                push('/dash/manage');
+                return;
+            }
+
             const result = await res.json();
             if (result.success) {
                 stats = result.data;
+            } else {
+                notify(result.message || 'Error loading analytics data', 'error');
             }
         } catch (err) {
             console.error('Failed to fetch stats:', err);
@@ -38,8 +56,8 @@
     <div class="stats-grid">
         <StatsCard title="Database Size" value={stats.total_resumes} icon="📁" color="#4f46e5" />
         <StatsCard title="Unique Skills" value={stats.total_skills_found} icon="⚡" color="#10b981" />
-        <StatsCard title="Active Jobs" value="3" icon="💼" color="#f59e0b" />
-        <StatsCard title="Avg Match" value="72%" icon="📈" color="#8b5cf6" />
+        <StatsCard title="Active Jobs" value={stats.total_jobs} icon="💼" color="#f59e0b" />
+        <StatsCard title="Applications" value={stats.total_applications} icon="📩" color="#8b5cf6" />
     </div>
 
     <div class="charts-section">

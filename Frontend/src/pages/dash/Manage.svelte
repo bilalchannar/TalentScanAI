@@ -5,6 +5,7 @@
     import SkillTag from '../../components/SkillTag.svelte';
     import StatsCard from '../../components/StatsCard.svelte';
     import { push } from 'svelte-spa-router';
+    import { apiFetch } from '../../api.js';
 
     let resumes = [];
     let totalCount = 0;
@@ -12,8 +13,6 @@
     let searchQuery = "";
     let isDragging = false;
     let userRole = localStorage.getItem('role') || 'candidate';
-    let userName = localStorage.getItem('name') || 'User';
-    let userEmail = localStorage.getItem('email') || '';
 
     $: filteredResumes = resumes.filter(r => 
         r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -26,17 +25,19 @@
 
     async function fetchResumes() {
         try {
-            // Build URL with optional email filter
-            let url = 'http://127.0.0.1:3000/api/resumes/list';
-            if (userRole === 'candidate') {
-                url += `?owner_email=${userEmail}`;
+            const res = await apiFetch('/api/resumes/list');
+            if (res.status === 401) {
+                notify('Session expired. Please login again.', 'error');
+                push('/auth/login');
+                return;
             }
 
-            const res = await fetch(url);
             const result = await res.json();
             if (result.success) {
                 resumes = result.data;
                 totalCount = resumes.length;
+            } else {
+                notify(result.message || 'Failed to load resumes', 'error');
             }
         } catch (err) {
             console.error("Error fetching resumes:", err);
@@ -49,18 +50,25 @@
         
         const formData = new FormData();
         formData.append('file', files[0]);
-        formData.append('owner_email', userEmail); // Tag upload with owner
 
         try {
-            const res = await fetch('http://127.0.0.1:3000/api/resumes/upload', {
+            const res = await apiFetch('/api/resumes/upload', {
                 method: 'POST',
                 body: formData
             });
-            if (res.ok) {
+
+            if (res.status === 401) {
+                notify('Session expired. Please login again.', 'error');
+                push('/auth/login');
+                return;
+            }
+
+            const result = await res.json();
+            if (result.success) {
                 notify("Resume uploaded & analyzed successfully", "success");
                 fetchResumes();
             } else {
-                notify("Upload failed", "error");
+                notify(result.message || 'Upload failed', 'error');
             }
         } catch (err) {
             console.error(err);
@@ -70,12 +78,22 @@
 
     async function deleteResume(id) {
         try {
-            const res = await fetch(`http://127.0.0.1:3000/api/resumes/delete_by_id/${id}`, {
+            const res = await apiFetch(`/api/resumes/delete_by_id/${id}`, {
                 method: 'DELETE'
             });
-            if (res.ok) {
+
+            if (res.status === 401) {
+                notify('Session expired. Please login again.', 'error');
+                push('/auth/login');
+                return;
+            }
+
+            const result = await res.json();
+            if (result.success) {
                 notify("Resume deleted successfully", "success");
                 fetchResumes();
+            } else {
+                notify(result.message || 'Delete failed', 'error');
             }
         } catch (err) {
             console.error(err);

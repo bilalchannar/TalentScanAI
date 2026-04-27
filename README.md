@@ -1,98 +1,81 @@
 # TalentScanAI 🚀
 
-TalentScanAI is a comprehensive full-stack application designed to streamline the recruitment process. It allows for efficient resume management, user authentication, and a modern dashboard interface.
+TalentScanAI is a state-of-the-art, full-stack recruitment platform designed to bridge the gap between recruiters and top talent using AI-driven insights. It features a modern, glassmorphic dashboard, dual-role access (Recruiter & Candidate), and a powerful resume-job matching engine.
 
 ## 🌟 Key Features
 
-- **User Authentication**: Secure login and signup system with JWT-based authentication.
-- **Password Management**: Features for password recovery, reset, and secure password changes.
-- **Resume Management**: Upload, list, and delete resumes with ease.
-- **Modern UI**: A responsive and intuitive frontend built with Svelte.
-- **Robust Backend**: A scalable Flask-based RESTful API with MongoDB integration.
-- **Dockerized**: Includes Docker and Docker Compose support for easy deployment.
+### 🏢 For Recruiters
+- **Job Posting Portal**: Create and manage job opportunities with detailed requirements.
+- **Candidate AI Ranking**: Automatically rank candidates based on their match score with the job description.
+- **Talent Analytics**: Real-time dashboard showing database size, unique skills, and application trends.
+- **Application Management**: View and process applications from interested candidates.
+
+### 👤 For Candidates
+- **Professional Job Feed**: Discover new opportunities tailored to your skill set.
+- **One-Click Application**: Apply to jobs instantly using your pre-uploaded and parsed resumes.
+- **Application History**: Track the status of your sent applications in real-time.
+- **Profile Management**: Update your professional identity and contact information.
+
+### 🛡️ Core Infrastructure
+- **Dual Authentication**: Secure JWT-based login with role-specific access control.
+- **Responsive Design**: Premium dark-mode interface with smooth animations and intuitive navigation.
+- **Dockerized Workflow**: Fully containerized environment with auto-reloading for development.
 
 ## 🛠️ Tech Stack
 
 ### Frontend
 - **Framework**: Svelte
+- **Routing**: `svelte-spa-router`
+- **Styling**: Vanilla CSS (Premium Glassmorphism)
 - **Bundler**: Rollup
-- **Styling**: Modern CSS
 
 ### Backend
-- **Language**: Python (Flask)
+- **Framework**: Flask (Python 3.9)
 - **Database**: MongoDB
 - **Authentication**: JWT (JSON Web Tokens)
 - **Containerization**: Docker & Docker Compose
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Node.js (v14+)
-- Python (v3.8+)
-- MongoDB
-- Docker (optional)
-
-### Backend Setup
-1. Navigate to the `Backend` directory:
-   ```bash
-   cd Backend
-   ```
-2. Create a virtual environment and activate it:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Set up environment variables:
-   Create a `.env` file or export the following:
-   - `MONGO_CONNECTION_URL`
-   - `MONGO_DATABASE_NAME`
-5. Run the application:
-   ```bash
-   python app.py
-   ```
-
-### Frontend Setup
-1. Navigate to the `Frontend` directory:
-   ```bash
-   cd Frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Run the development server:
-   ```bash
-   npm run dev
-   ```
-
-### Running with Docker
-You can spin up the entire environment using Docker Compose:
+### Quick Start with Docker (Recommended)
+Spin up the entire ecosystem (Frontend, Backend, MongoDB, Mongo-Express) with a single command:
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
+*The development environment supports **Hot Reloading**. Changes to code will reflect instantly.*
+
+### Manual Setup
+
+#### Backend
+1. `cd Backend`
+2. `pip install -r requirements.txt`
+3. Configure environment variables (see `.env` section).
+4. `python app.py`
+
+#### Frontend
+1. `cd Frontend`
+2. `npm install`
+3. `npm run dev`
 
 ## 📂 Project Structure
 
 ```text
 .
 ├── Backend/                 # Flask REST API
-│   ├── app.py               # Main application entry point
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile           # Backend container configuration
+│   ├── app.py               # API routes & Core logic
+│   ├── Dockerfile           # Backend containerization
+│   └── requirements.txt     # Python libraries
 ├── Frontend/                # Svelte Frontend
-│   ├── src/                 # Source files
-│   ├── public/              # Static assets
+│   ├── src/                 # Svelte components & Pages
+│   ├── public/              # Static build files
+│   ├── Dockerfile           # Multi-stage production build
 │   └── rollup.config.js     # Bundler configuration
+├── compose.yaml             # Docker orchestration
 └── README.md                # Project documentation
 ```
 
 ## 🛡️ License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ---
 Developed with ❤️ by [Bilal Channar](https://github.com/bilalchannar)

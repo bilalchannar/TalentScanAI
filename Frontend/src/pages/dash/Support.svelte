@@ -1,5 +1,6 @@
 <script>
     import { notify } from '../../notificationStore.js';
+    import { apiFetch } from '../../api.js';
     import { fade, slide } from 'svelte/transition';
 
     let contactForm = {
@@ -30,13 +31,28 @@
         faqs = faqs;
     }
 
-    function handleSubmit() {
+    async function handleSubmit() {
         if (!contactForm.message) {
             notify("Please enter a message", "info");
             return;
         }
-        notify("Support ticket created! We'll get back to you shortly.", "success");
-        contactForm.message = '';
+        
+        try {
+            const res = await apiFetch('/api/support/ticket', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(contactForm)
+            });
+            const result = await res.json();
+            if (result.success) {
+                notify("Support ticket created! We'll get back to you shortly.", "success");
+                contactForm.message = '';
+            } else {
+                notify(result.message || "Failed to create ticket", "error");
+            }
+        } catch (err) {
+            notify("Connection error", "error");
+        }
     }
 </script>
 
