@@ -10,9 +10,10 @@
     let password = '';
     let confirmPassword = '';
     let role = 'candidate';
+    let loading = false;
 
-    async function signup(event) {
-        event.preventDefault();
+    async function signup() {
+        if (loading) return;
         
         if (password !== confirmPassword) {
             notify("Passwords don't match!", "error");
@@ -39,6 +40,8 @@
         } catch (error) {
             console.error('Signup error:', error);
             notify('An error occurred during signup', 'error');
+        } finally {
+            loading = false;
         }
     }
 </script>
@@ -68,7 +71,7 @@
                 </button>
             </div>
 
-            <form on:submit={signup}>
+            <form on:submit|preventDefault={signup}>
                 <div class="input-group">
                     <label for="fullName">Full Name</label>
                     <input id="fullName" type="text" bind:value={name} placeholder="e.g. Bilal Tariq" required>
@@ -89,7 +92,9 @@
                     <input id="confirmPassword" type="password" bind:value={confirmPassword} placeholder="Repeat password" required>
                 </div>
 
-                <button type="submit" class="submit-btn">Get Started</button>
+                <button type="submit" class="submit-btn" disabled={loading}>
+                    {loading ? 'Creating Account...' : 'Get Started'}
+                </button>
             </form>
 
             <div class="extra-links">
@@ -98,7 +103,7 @@
         </div>
 
         <div class="auth-image-section">
-            <img src="imgs/front.png" alt="Signup Illustration">
+            <img src="/imgs/front.png" alt="Signup Illustration">
             <h3>Start Your Journey</h3>
             <p style="opacity: 0.8; margin-top: 10px; font-size: 14px;">Whether you're hiring or seeking, our AI ensures the perfect match every single time.</p>
         </div>

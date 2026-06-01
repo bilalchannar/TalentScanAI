@@ -9,6 +9,7 @@ TalentScanAI is a state-of-the-art, full-stack recruitment platform designed to 
 - **Candidate AI Ranking**: Automatically rank candidates based on their match score with the job description.
 - **Talent Analytics**: Real-time dashboard showing database size, unique skills, and application trends.
 - **Application Management**: View and process applications from interested candidates.
+- **Admin Panel**: Manage user roles, blocks, and view detailed audit logs.
 
 ### 👤 For Candidates
 - **Professional Job Feed**: Discover new opportunities tailored to your skill set.
@@ -35,6 +36,29 @@ TalentScanAI is a state-of-the-art, full-stack recruitment platform designed to 
 - **Authentication**: JWT (JSON Web Tokens)
 - **Containerization**: Docker & Docker Compose
 
+## 🔑 Environment Variables
+
+The backend relies on the following environment variables (defined in `Backend/.env` or injected via Docker):
+
+```env
+MONGO_DATABASE_NAME=TalentScanAI
+MONGO_CONNECTION_URL=mongodb://localhost:27017/TalentScanAI # Use mongodb://mongo:27017/TalentScanAI in Docker
+JWT_SECRET_KEY=your-super-secret-key
+JWT_EXP_MINUTES=120
+RESET_TOKEN_EXP_MINUTES=15
+ALLOW_PUBLIC_RECRUITER_SIGNUP=true
+EXPOSE_RESET_TOKEN=false
+FLASK_DEBUG=true
+
+# Email System (Required for forgot password and notifications)
+EMAIL_SEND_ENABLED=true
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password    # Use an App Password, not your standard password
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+CLIENT_URL=http://localhost:5000
+```
+
 ## 🚀 Getting Started
 
 ### Quick Start with Docker (Recommended)
@@ -42,20 +66,30 @@ Spin up the entire ecosystem (Frontend, Backend, MongoDB, Mongo-Express) with a 
 ```bash
 docker compose up --build
 ```
+- **Frontend**: http://localhost:5000
+- **Backend API**: http://localhost:3000
+- **Mongo Express**: http://localhost:8082 (admin/change-this-password)
+
 *The development environment supports **Hot Reloading**. Changes to code will reflect instantly.*
 
 ### Manual Setup
 
+#### Database
+Make sure you have MongoDB running locally on port `27017`.
+
 #### Backend
-1. `cd Backend`
-2. `pip install -r requirements.txt`
-3. Configure environment variables (see `.env` section).
-4. `python app.py`
+```bash
+cd Backend
+pip install -r requirements.txt
+python app.py
+```
 
 #### Frontend
-1. `cd Frontend`
-2. `npm install`
-3. `npm run dev`
+```bash
+cd Frontend
+npm install
+npm run dev
+```
 
 ## 📂 Project Structure
 
@@ -63,6 +97,7 @@ docker compose up --build
 .
 ├── Backend/                 # Flask REST API
 │   ├── app.py               # API routes & Core logic
+│   ├── email_templates.py   # Reusable HTML email bodies
 │   ├── Dockerfile           # Backend containerization
 │   └── requirements.txt     # Python libraries
 ├── Frontend/                # Svelte Frontend
@@ -73,6 +108,20 @@ docker compose up --build
 ├── compose.yaml             # Docker orchestration
 └── README.md                # Project documentation
 ```
+
+## ✅ Final Testing Checklist
+
+Before deploying to production, ensure you have tested the following flows:
+
+- [ ] **Infrastructure**: Backend, Frontend, and MongoDB start without errors.
+- [ ] **Auth**: Registration, Login, Logout, and Role-Based Access Control work.
+- [ ] **Email System**: Password Reset emails generate properly and links are secure.
+- [ ] **Resume Engine**: PDF Upload works, duplicate checks trigger, AI/ATS scores generate.
+- [ ] **Recruiter Flow**: Job Posting, Job Statuses, Candidate Ranking, Interview Scheduling.
+- [ ] **Candidate Flow**: Feed viewing, One-click applying, Profile tracking, Cover Letter generator.
+- [ ] **Notifications**: In-app unread badges update, Emails send for status changes.
+- [ ] **Security**: Super Admin hierarchy blocks unauthorized changes, Audit logs track critical actions.
+- [ ] **UI**: Dark/Light mode toggles cleanly, responsive hamburger menu functions correctly on mobile.
 
 ## 🛡️ License
 This project is licensed under the MIT License.

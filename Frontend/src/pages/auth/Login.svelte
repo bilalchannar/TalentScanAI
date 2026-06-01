@@ -8,8 +8,11 @@
     let email = '';
     let password = '';
     let role = 'candidate';
+    let loading = false;
 
     async function login() {
+        if (loading) return;
+        loading = true;
         try {
             const response = await fetch(withApiBase('/api/auth/login'), {
                 method: 'POST',
@@ -34,6 +37,8 @@
         } catch (error) {
             console.error('Login error:', error);
             notify('An error occurred during login', 'error');
+        } finally {
+            loading = false;
         }
     }
 </script>
@@ -87,7 +92,9 @@
                     />
                 </div>
 
-                <button type="submit" class="submit-btn">Sign In</button>
+                <button type="submit" class="submit-btn" disabled={loading}>
+                    {loading ? 'Signing in...' : 'Sign In'}
+                </button>
             </form>
 
             <div class="extra-links">
@@ -97,7 +104,7 @@
         </div>
 
         <div class="auth-image-section">
-            <img src="imgs/front.png" alt="Login Graphic">
+            <img src="/imgs/front.png" alt="Login Graphic">
             <h3>Enterprise-Grade AI Ranking</h3>
             <p style="opacity: 0.8; margin-top: 10px; font-size: 14px;">Join thousands of recruiters finding the best talent in seconds with TalentScanAI.</p>
         </div>

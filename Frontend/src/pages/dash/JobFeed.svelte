@@ -72,36 +72,69 @@
 
 <div class="job-feed">
     {#if loading}
-        <div class="loader">Scanning for opportunities...</div>
-    {:else if jobs.length === 0}
-        <div class="empty-state">
-            <span class="icon">🔍</span>
-            <h3>No jobs found</h3>
-            <p>Check back later for new opportunities.</p>
-        </div>
-    {:else}
         <div class="jobs-grid">
-            {#each jobs as job}
-                <div class="job-card glass">
+            {#each Array(6) as _}
+                <div class="job-card glass skeleton-pulse">
                     <div class="job-header">
-                        <div>
-                            <h4>{job.title}</h4>
-                            <p class="company">{job.company} • <span class="loc">{job.location}</span></p>
+                        <div style="flex: 1;">
+                            <div class="skeleton-line" style="width: 150px; height: 18px; margin-bottom: 8px;"></div>
+                            <div class="skeleton-line" style="width: 100px; height: 14px;"></div>
                         </div>
-                        <span class="badge">New</span>
                     </div>
-                    
                     <div class="job-desc">
-                        {job.description.substring(0, 150)}...
+                        <div class="skeleton-line" style="width: 95%; height: 14px; margin-top: 10px;"></div>
+                        <div class="skeleton-line" style="width: 80%; height: 14px;"></div>
                     </div>
-
                     <div class="job-footer">
-                        <span class="date">Posted {new Date(job.created_at).toLocaleDateString()}</span>
-                        <button class="apply-btn" on:click={() => selectedJob = job}>Apply Now</button>
+                        <div class="skeleton-line" style="width: 80px; height: 12px; margin: 0;"></div>
+                        <div class="skeleton-line" style="width: 100px; height: 32px; border-radius: 10px; margin: 0;"></div>
                     </div>
                 </div>
             {/each}
         </div>
+    {:else}
+        {@const activeJobs = jobs.filter(j => j.status !== 'Draft' && j.status !== 'Closed')}
+        {#if activeJobs.length === 0}
+            <div class="empty-state-container" style="margin-top: 20px;">
+                <div class="empty-emoji">🔍</div>
+                <h3>No active jobs found</h3>
+                <p>Check back later! Recruiters will list matching positions soon.</p>
+            </div>
+        {:else}
+            <div class="jobs-grid">
+                {#each activeJobs as job}
+                    <div class="job-card glass">
+                        <div class="job-header">
+                            <div>
+                                <h4>{job.title}</h4>
+                                <p class="company">{job.company} • <span class="loc">{job.location}</span></p>
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                {#if job.status === 'Paused'}
+                                    <span class="badge paused-badge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">Paused</span>
+                                {/if}
+                                {#if (Date.now() - new Date(job.created_at).getTime()) < 72 * 60 * 60 * 1000}
+                                    <span class="badge">New</span>
+                                {/if}
+                            </div>
+                        </div>
+                        
+                        <div class="job-desc">
+                            {job.description.substring(0, 150)}...
+                        </div>
+
+                        <div class="job-footer">
+                            <span class="date">Posted {new Date(job.created_at).toLocaleDateString()}</span>
+                            {#if job.status === 'Paused'}
+                                <button class="apply-btn paused-btn" style="background: #94a3b8; cursor: not-allowed;" disabled>Paused</button>
+                            {:else}
+                                <button class="apply-btn" on:click={() => selectedJob = job}>Apply Now</button>
+                            {/if}
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        {/if}
     {/if}
 
     {#if selectedJob}
@@ -120,7 +153,7 @@
                             {/each}
                         </select>
                     {:else}
-                        <p class="no-resumes">You haven't uploaded any resumes yet. Go to "My Application" to upload one.</p>
+                        <p class="no-resumes">You haven't uploaded any resumes yet. Go to <strong>"Manage Resumes"</strong> to upload one first.</p>
                     {/if}
 
                     <div class="actions">
@@ -331,10 +364,49 @@
         cursor: pointer;
     }
 
-    .loader {
+    /* Skeleton Loading CSS */
+    @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+    }
+    .skeleton-pulse {
+        animation: pulse 1.5s infinite ease-in-out;
+    }
+    .skeleton-line {
+        background: var(--bg-primary);
+        border-radius: 4px;
+        margin-bottom: 8px;
+    }
+
+    /* Empty States Styling */
+    .empty-state-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 40px;
         text-align: center;
-        padding: 100px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        box-shadow: var(--shadow);
+        width: 100%;
+    }
+    .empty-emoji {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+    .empty-state-container h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0 0 8px 0;
+    }
+    .empty-state-container p {
+        font-size: 14px;
         color: var(--text-secondary);
+        max-width: 400px;
+        margin: 0 0 16px 0;
     }
 
     @keyframes fadeIn {

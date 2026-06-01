@@ -14,7 +14,15 @@ __pycache__/
 venv/
 .venv/
 env/
+
+# Environment variables (NEVER commit real secrets)
 .env
+.env.local
+.env.production
+Backend/.env
+
+# Logs
+*.log
 
 # IDEs
 .vscode/

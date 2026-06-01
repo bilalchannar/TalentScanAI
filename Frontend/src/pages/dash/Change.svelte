@@ -7,7 +7,10 @@
 
     let profile = {
         name: 'User',
-        email: ''
+        email: '',
+        phone: '',
+        linkedin: '',
+        portfolio: ''
     };
 
     let passwordData = {
@@ -22,7 +25,7 @@
         darkMode: localStorage.getItem('theme') === 'dark'
     };
 
-    onMount(() => {
+    onMount(async () => {
         if (!getToken()) {
             push('/auth/login');
             return;
@@ -30,8 +33,23 @@
 
         profile = {
             name: localStorage.getItem('name') || 'User',
-            email: localStorage.getItem('email') || ''
+            email: localStorage.getItem('email') || '',
+            phone: '',
+            linkedin: '',
+            portfolio: ''
         };
+
+        try {
+            const res = await apiFetch('/api/candidate/profile_status');
+            const data = await res.json();
+            if (data.success) {
+                profile.phone = data.data.phone || '';
+                profile.linkedin = data.data.linkedin || '';
+                profile.portfolio = data.data.portfolio || '';
+            }
+        } catch (err) {
+            console.error(err);
+        }
     });
 
     async function saveProfile() {
@@ -39,13 +57,22 @@
             const res = await apiFetch('/api/auth/update_profile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: profile.name, email: profile.email })
+                body: JSON.stringify({ 
+                    name: profile.name, 
+                    email: profile.email,
+                    phone: profile.phone,
+                    linkedin: profile.linkedin,
+                    portfolio: profile.portfolio
+                })
             });
             const result = await res.json();
             if (result.success) {
                 localStorage.setItem('name', profile.name);
                 localStorage.setItem('email', profile.email);
                 notify("Profile updated successfully", "success");
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             } else {
                 notify(result.message || "Failed to update profile", "error");
             }
@@ -115,7 +142,7 @@
             <p class="section-desc">Manage your public identity and contact details.</p>
             
             <div class="profile-preview">
-                <div class="p-avatar">{profile.name[0]}</div>
+                <div class="p-avatar">{profile.name?.[0]?.toUpperCase() || 'U'}</div>
                 <div>
                     <h4>{profile.name}</h4>
                     <p>{profile.email}</p>
@@ -129,6 +156,18 @@
             <div class="form-group">
                 <label for="profileEmail">Email Address</label>
                 <input id="profileEmail" type="email" bind:value={profile.email} placeholder="Email" />
+            </div>
+            <div class="form-group">
+                <label for="profilePhone">Phone Number</label>
+                <input id="profilePhone" type="text" bind:value={profile.phone} placeholder="+923135100014" />
+            </div>
+            <div class="form-group">
+                <label for="profileLinkedin">LinkedIn Profile Link</label>
+                <input id="profileLinkedin" type="url" bind:value={profile.linkedin} placeholder="https://linkedin.com/in/username" />
+            </div>
+            <div class="form-group">
+                <label for="profilePortfolio">Portfolio Website Link</label>
+                <input id="profilePortfolio" type="url" bind:value={profile.portfolio} placeholder="https://myportfolio.com" />
             </div>
             <button class="primary-btn" on:click={saveProfile}>Save Changes</button>
         </div>
@@ -199,7 +238,7 @@
             <h3>⚠️ Danger Zone</h3>
             <p class="section-desc">Irreversible account actions.</p>
             <div class="danger-actions">
-                <button class="outline-btn" on:click={() => window.location.href='#/auth/logout'}>Logout from session</button>
+                <button class="outline-btn" on:click={() => push('/auth/logout')}>Logout from session</button>
                 <button class="delete-btn" on:click={() => notify("Account deletion is restricted for this demo", "info")}>Delete My Account</button>
             </div>
         </div>

@@ -89,10 +89,17 @@
 
             <div class="quick-links">
                 <div class="link-item">
+                    <span class="l-icon">📧</span>
+                    <div>
+                        <p class="l-label">Support Email</p>
+                        <p class="l-val">support@talentscan.ai</p>
+                    </div>
+                </div>
+                <div class="link-item">
                     <span class="l-icon">📞</span>
                     <div>
                         <p class="l-label">Support Line</p>
-                        <p class="l-val">+1 (555) 123-4567</p>
+                        <p class="l-val">+92 313 5100014</p>
                     </div>
                 </div>
                 <div class="link-item">

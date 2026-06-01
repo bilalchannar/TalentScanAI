@@ -4,7 +4,7 @@
     import { fade, fly } from 'svelte/transition';
     import { push } from 'svelte-spa-router';
     import { reasoningReport } from '../../reasoningStore.js';
-    import { apiFetch, withApiBase } from '../../api.js';
+    import { apiFetch } from '../../api.js';
 
     let userRole = localStorage.getItem('role') || 'candidate';
 
@@ -51,15 +51,31 @@
         }
     }
 
-    function viewPdf(filename) {
-        const token = localStorage.getItem('token') || '';
-        selectedPdf = withApiBase(`/api/resumes/view/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`);
+    async function viewPdf(filename) {
+        try {
+            // Use apiFetch to send token in Authorization header (not in URL)
+            const res = await apiFetch(`/api/resumes/view/${encodeURIComponent(filename)}`);
+            if (!res.ok) {
+                notify('Could not load resume.', 'error');
+                return;
+            }
+            const blob = await res.blob();
+            // Revoke previous blob URL to avoid memory leaks
+            if (selectedPdf && selectedPdf.startsWith('blob:')) URL.revokeObjectURL(selectedPdf);
+            selectedPdf = URL.createObjectURL(blob);
+        } catch (err) {
+            notify('Failed to load resume.', 'error');
+        }
     }
 
     function showReasoning(result) {
+        result.job_description = jobDescription;
         reasoningReport.set(result);
         push('/dash/reasoning');
     }
+
+    let minScore = 0;
+    $: filteredResults = results.filter(r => r.score >= minScore);
 </script>
 
 <div class="rank-page">
@@ -88,11 +104,15 @@
     {#if results.length > 0}
         <div class="results-section" in:fade>
             <div class="section-header">
-                <h3>{userRole === 'recruiter' ? `Match Results (${results.length})` : 'Your Match Analysis'}</h3>
+                <h3>{userRole === 'recruiter' ? `Match Results (${filteredResults.length})` : 'Your Match Analysis'}</h3>
+                <div class="score-filter">
+                    <label for="scoreRange">Min Match Score: <strong>{minScore}%</strong></label>
+                    <input id="scoreRange" type="range" min="0" max="100" bind:value={minScore} />
+                </div>
             </div>
             
             <div class="results-grid">
-                {#each results as result, index}
+                {#each filteredResults as result, index}
                     <div class="result-card" in:fly={{ y: 20, delay: index * 100 }}>
                         <div class="rank-badge">#{index + 1}</div>
                         <div class="card-content">
@@ -106,8 +126,15 @@
                             <p class="filename">📄 {result.filename.split('_').slice(1).join('_')}</p>
                             
                             <div class="skills-preview">
-                                <SkillTag skill="Extracted Match" />
-                                <SkillTag skill="AI Verified" />
+                                {#each (result.matched_skills || []).slice(0, 3) as skill}
+                                    <SkillTag {skill} />
+                                {/each}
+                                {#if (result.matched_skills || []).length > 3}
+                                    <span class="more-skills">+{result.matched_skills.length - 3} more</span>
+                                {/if}
+                                {#if (result.matched_skills || []).length === 0}
+                                    <span style="font-size: 12px; color: var(--text-secondary);">No keyword matches</span>
+                                {/if}
                             </div>
 
                             <div class="actions">
@@ -118,6 +145,12 @@
                     </div>
                 {/each}
             </div>
+
+            {#if filteredResults.length === 0}
+                <div class="empty-state" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <p>No candidates match the selected minimum score of {minScore}%.</p>
+                </div>
+            {/if}
         </div>
     {/if}
 
@@ -374,5 +407,47 @@
 
     @keyframes spin {
         to { transform: rotate(360deg); }
+    }
+    .more-skills {
+        font-size: 12px;
+        color: var(--text-secondary);
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .score-filter {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        padding: 8px 16px;
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+    }
+
+    .score-filter label {
+        font-size: 13px;
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    .score-filter input[type="range"] {
+        cursor: pointer;
+        accent-color: var(--accent-primary);
+        width: 150px;
     }
 </style>

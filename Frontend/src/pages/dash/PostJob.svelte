@@ -1,14 +1,14 @@
 <script>
     import { onMount } from 'svelte';
     import { apiFetch } from '../../api.js';
-    import { push } from 'svelte-spa-router';
     import { notify } from '../../notificationStore.js';
 
     let jobData = {
         title: '',
         company: '',
         location: 'Remote',
-        description: ''
+        description: '',
+        status: 'Active'
     };
 
     let loading = false;
@@ -53,7 +53,7 @@
 
             if (data.success) {
                 notify('Job posted successfully!', 'success');
-                jobData = { title: '', company: '', location: 'Remote', description: '' };
+                jobData = { title: '', company: '', location: 'Remote', description: '', status: 'Active' };
                 await fetchMyJobs();
             } else {
                 notify(data.message || 'Failed to post job', 'error');
@@ -62,6 +62,25 @@
             notify('Connection error', 'error');
         } finally {
             loading = false;
+        }
+    }
+
+    async function updateJobStatus(jobId, newStatus) {
+        try {
+            const res = await apiFetch('/api/jobs/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job_id: jobId, status: newStatus })
+            });
+            const data = await res.json();
+            if (data.success) {
+                notify(`Job status updated to ${newStatus}`, 'success');
+                await fetchMyJobs();
+            } else {
+                notify(data.message || 'Failed to update status', 'error');
+            }
+        } catch (err) {
+            notify('Network error', 'error');
         }
     }
 </script>
@@ -91,6 +110,16 @@
                 </select>
             </div>
 
+            <div class="form-group">
+                <label for="status">Initial Status</label>
+                <select id="status" bind:value={jobData.status}>
+                    <option value="Active">Active</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Paused">Paused</option>
+                    <option value="Closed">Closed</option>
+                </select>
+            </div>
+
             <div class="form-group full-width">
                 <label for="description">Job Description (Requirements & Skills)</label>
                 <textarea id="description" bind:value={jobData.description} placeholder="Paste requirements here. Our AI will use this to rank candidates." rows="6"></textarea>
@@ -116,11 +145,25 @@
             <div class="jobs-list">
                 {#each myJobs as job}
                     <div class="job-item">
-                        <div class="info">
+                        <div class="info" style="flex: 1;">
                             <span class="title">{job.title}</span>
-                            <span class="meta">{job.company} • {job.location}</span>
+                            <span class="meta">{job.company} • {job.location} • <span class="status-badge {job.status.toLowerCase()}">{job.status}</span></span>
                         </div>
-                        <span class="date">{new Date(job.created_at).toLocaleDateString()}</span>
+                        <div class="actions-area" style="display: flex; align-items: center; gap: 15px;">
+                            <div class="status-select-wrap">
+                                <select 
+                                    style="padding: 6px 12px; font-size: 13px; border-radius: 8px;"
+                                    value={job.status || 'Active'} 
+                                    on:change={(e) => updateJobStatus(job._id, e.target.value)}
+                                >
+                                    <option value="Active">Active</option>
+                                    <option value="Draft">Draft</option>
+                                    <option value="Paused">Paused</option>
+                                    <option value="Closed">Closed</option>
+                                </select>
+                            </div>
+                            <span class="date">{new Date(job.created_at).toLocaleDateString()}</span>
+                        </div>
                     </div>
                 {/each}
             </div>
@@ -267,4 +310,17 @@
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
+
+    .status-badge {
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    .status-badge.active { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .status-badge.draft { background: rgba(148, 163, 184, 0.1); color: #64748b; }
+    .status-badge.paused { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .status-badge.closed { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 </style>

@@ -1,0 +1,14 @@
+# Docker ignore - prevents unnecessary files from being copied into the Docker image
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+!.env.example
+static/resumes/
+*.md
+nodemon.json
