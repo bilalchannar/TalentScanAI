@@ -188,8 +188,7 @@
     <aside class="sidebar" class:mobile-open={isMobileMenuOpen}>
         <div class="top-section">
             <div class="logo" on:click={() => isMobileMenuOpen = false}>
-                <div class="logo-icon">TS</div>
-                <span>TalentScanAI</span>
+                <img src="/imgs/logo.png" alt="TalentScanAI Logo" style="max-height: 40px; width: auto; object-fit: contain;" />
             </div>
 
             <div class="user-pill">
