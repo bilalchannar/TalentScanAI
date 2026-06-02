@@ -1,8 +1,7 @@
 // API base URL — can be overridden by setting window.API_BASE_URL in index.html
-// or by using a build-time environment variable.
-// Default: same host as frontend (for production where backend and frontend are on same domain)
-// For local dev: http://127.0.0.1:3000
-const API_BASE_URL = window.API_BASE_URL || 'http://127.0.0.1:3000';
+// Default: production backend on Render, or localhost for local development
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = window.API_BASE_URL || (isLocal ? 'http://127.0.0.1:3000' : 'https://talentscan-backend.onrender.com');
 
 /**
  * Builds a full URL from a path, using the configured API base URL.
