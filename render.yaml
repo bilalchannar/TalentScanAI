@@ -1,6 +1,7 @@
 services:
   # Backend Web Service
   - type: web
+    plan: free
     name: talentscan-backend
     env: python
     rootDir: Backend
