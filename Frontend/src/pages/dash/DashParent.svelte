@@ -189,6 +189,7 @@
         <div class="top-section">
             <div class="logo" on:click={() => isMobileMenuOpen = false}>
                 <img src="/imgs/logo.png" alt="TalentScanAI Logo" style="max-height: 40px; width: auto; object-fit: contain;" />
+                <span>TalentScanAI</span>
             </div>
 
             <div class="user-pill">
