@@ -105,8 +105,6 @@
                 })
             });
 
-            });
-
             const result = await res.json();
             if (result.success) {
                 notify("Password changed securely", "success");

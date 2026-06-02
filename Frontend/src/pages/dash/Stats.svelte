@@ -36,6 +36,7 @@
         }
 
         loading = true;
+        try {
             const res = await apiFetch('/api/stats');
 
             if (res.status === 403) {

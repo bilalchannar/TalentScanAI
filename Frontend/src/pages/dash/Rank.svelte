@@ -29,8 +29,6 @@
                 body: JSON.stringify({ job_description: jobDescription })
             });
 
-            });
-
             const result = await res.json();
             
             if (result.success) {
