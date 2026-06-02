@@ -13,6 +13,7 @@
     let searchQuery = "";
     let isDragging = false;
     let userRole = localStorage.getItem('role') || 'candidate';
+    let selectedCandidate = null;
 
     // Activity Feed
     let activityFeed = [];
@@ -173,11 +174,6 @@
         loadingResumes = true;
         try {
             const res = await apiFetch('/api/resumes/list');
-            if (res.status === 401) {
-                notify('Session expired. Please login again.', 'error');
-                push('/auth/login');
-                return;
-            }
 
             const result = await res.json();
             if (result.success) {
@@ -207,12 +203,6 @@
                 body: formData
             });
 
-            if (res.status === 401) {
-                notify('Session expired. Please login again.', 'error');
-                push('/auth/login');
-                return;
-            }
-
             const result = await res.json();
             if (result.success) {
                 notify("Resume uploaded & analyzed successfully", "success");
@@ -238,12 +228,6 @@
             const res = await apiFetch(`/api/resumes/delete_by_id/${id}`, {
                 method: 'DELETE'
             });
-
-            if (res.status === 401) {
-                notify('Session expired. Please login again.', 'error');
-                push('/auth/login');
-                return;
-            }
 
             const result = await res.json();
             if (result.success) {
@@ -365,10 +349,10 @@
                     </div>
                 {/each}
             {:else}
-                <StatsCard title="Total Candidates" value={stats.total_resumes ?? totalCount} icon="👥" color="#4f46e5" />
-                <StatsCard title="Active Jobs" value={stats.active_jobs ?? 0} icon="💼" color="#10b981" />
-                <StatsCard title="Pending Applications" value={stats.pending_applications ?? 0} icon="⏳" color="#f59e0b" />
-                <StatsCard title="Applications Today" value={stats.applications_today ?? 0} icon="📅" color="#ec4899" />
+                <StatsCard title="Total Candidates" value={stats.total_resumes ?? totalCount} icon="👥" color="#4f46e5" on:click={() => push('/dash/manage')} />
+                <StatsCard title="Active Jobs" value={stats.active_jobs ?? 0} icon="💼" color="#10b981" on:click={() => push('/dash/applications')} />
+                <StatsCard title="Pending Applications" value={stats.pending_applications ?? 0} icon="⏳" color="#f59e0b" on:click={() => push('/dash/applications')} />
+                <StatsCard title="Applications Today" value={stats.applications_today ?? 0} icon="📅" color="#ec4899" on:click={() => push('/dash/applications')} />
                 <StatsCard title="Avg Match Score" value={(stats.average_match_score ?? 0) + '%'} icon="🎯" color="#3b82f6" />
                 <StatsCard title="Top Detected Skill" value={stats.top_detected_skill ?? 'None'} icon="🧠" color="#8b5cf6" />
             {/if}
@@ -449,7 +433,7 @@
         {:else}
             <div class="resume-grid">
                 {#each filteredResumes as resume (resume._id)}
-                    <div class="resume-card" in:fly={{ y: 20, duration: 400 }}>
+                    <div class="resume-card" in:fly={{ y: 20, duration: 400 }} on:click={() => selectedCandidate = resume} style="cursor: pointer;">
                         <div class="card-header">
                             <div class="avatar">{resume.name ? resume.name[0] : 'C'}</div>
                             <div class="info">
@@ -473,7 +457,7 @@
                         </div>
 
                         <div class="card-footer">
-                            <a href="/#/dash/rank" class="rank-link">AI Match Analysis</a>
+                            <a href="/#/dash/rank" class="rank-link" on:click|stopPropagation>AI Match Analysis</a>
                         </div>
                     </div>
                 {/each}
@@ -484,6 +468,50 @@
                     <div class="empty-emoji">🔍</div>
                     <h3>No candidates found</h3>
                     <p>Try adjusting your search query or upload a new candidate resume.</p>
+                </div>
+            {/if}
+
+            {#if selectedCandidate}
+                <div class="modal-overlay" on:click={() => selectedCandidate = null}>
+                    <div class="modal-content glass candidate-modal" on:click|stopPropagation>
+                        <div class="modal-header">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div class="avatar-large">{selectedCandidate.name ? selectedCandidate.name[0] : 'C'}</div>
+                                <div>
+                                    <h3 style="margin: 0; font-size: 22px;">{selectedCandidate.name || 'Unknown Candidate'}</h3>
+                                    <p style="margin: 4px 0 0 0; color: var(--text-secondary);">{selectedCandidate.owner_email || 'No email provided'}</p>
+                                </div>
+                            </div>
+                            <button class="close-btn" on:click={() => selectedCandidate = null}>&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="detail-row">
+                                <strong>Phone:</strong> <span>{selectedCandidate.phone || 'N/A'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <strong>Education:</strong> <span>{selectedCandidate.education?.length ? selectedCandidate.education.join(', ') : 'Not detected'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <strong>Experience:</strong> <span>{selectedCandidate.experience?.length ? selectedCandidate.experience.join(', ') : 'Not detected'}</span>
+                            </div>
+                            
+                            <h4 style="margin-top: 20px;">Detected Skills</h4>
+                            <div class="skills-section">
+                                {#if selectedCandidate.skills && selectedCandidate.skills.length > 0}
+                                    {#each selectedCandidate.skills as skill}
+                                        <SkillTag {skill} />
+                                    {/each}
+                                {:else}
+                                    <p class="no-skills">No skills extracted</p>
+                                {/if}
+                            </div>
+                            
+                            <div class="modal-actions" style="margin-top: 30px; display: flex; gap: 15px;">
+                                <a href="/#/dash/rank" class="primary-btn-sm" style="text-decoration: none; text-align: center;">Run AI Match</a>
+                                <button class="secondary-btn-sm" style="background: #fee2e2; color: #ef4444; border-color: #fca5a5;" on:click={() => { deleteResume(selectedCandidate._id); selectedCandidate = null; }}>Delete Candidate</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             {/if}
         {/if}

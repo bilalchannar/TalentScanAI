@@ -36,14 +36,7 @@
         }
 
         loading = true;
-        try {
             const res = await apiFetch('/api/stats');
-
-            if (res.status === 401) {
-                notify('Session expired. Please login again', 'error');
-                push('/auth/login');
-                return;
-            }
 
             if (res.status === 403) {
                 notify('Access denied', 'error');
@@ -100,11 +93,11 @@
 {:else}
     <div class="stats-page" in:fade>
         <div class="stats-grid">
-            <StatsCard title="Database Size" value={stats.db_size || "0 KB"} icon="📁" color="#4f46e5" />
+            <StatsCard title="Database Size" value={stats.db_size || "0 KB"} icon="📁" color="#4f46e5" on:click={() => push('/dash/manage')} />
             <StatsCard title="Unique Skills" value={stats.total_skills_found ?? 0} icon="⚡" color="#10b981" />
-            <StatsCard title="Active Jobs" value={stats.active_jobs ?? 0} icon="💼" color="#f59e0b" />
-            <StatsCard title="Total Candidates" value={stats.total_resumes ?? 0} icon="👥" color="#ec4899" />
-            <StatsCard title="Total Applications" value={stats.total_applications ?? 0} icon="📩" color="#8b5cf6" />
+            <StatsCard title="Active Jobs" value={stats.active_jobs ?? 0} icon="💼" color="#f59e0b" on:click={() => push('/dash/applications')} />
+            <StatsCard title="Total Candidates" value={stats.total_resumes ?? 0} icon="👥" color="#ec4899" on:click={() => push('/dash/manage')} />
+            <StatsCard title="Total Applications" value={stats.total_applications ?? 0} icon="📩" color="#8b5cf6" on:click={() => push('/dash/applications')} />
         </div>
 
         <div class="charts-section">

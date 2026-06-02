@@ -50,8 +50,15 @@ export async function apiFetch(path, options = {}) {
         headers.Authorization = `Bearer ${token}`;
     }
 
-    return fetch(withApiBase(path), {
+    const response = await fetch(withApiBase(path), {
         ...options,
         headers
     });
+
+    if (response.status === 401) {
+        clearAuthStorage();
+        window.location.hash = '#/auth/login';
+    }
+
+    return response;
 }

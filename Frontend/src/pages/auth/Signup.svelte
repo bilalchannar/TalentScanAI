@@ -29,13 +29,26 @@
                 body: JSON.stringify({ name, email, password, role }),
             });
 
-            const { message } = await response.json();
+            const result = await response.json();
             
             if(response.status === 201) {
                 notify(`Success! Registered as ${role.toUpperCase()}`, 'success');
-                replace('/auth/login');
+                // Store auth details in localStorage
+                if (result.data) {
+                    localStorage.setItem('token', result.data.token);
+                    localStorage.setItem('role', result.data.role);
+                    localStorage.setItem('name', result.data.name);
+                    localStorage.setItem('email', result.data.email);
+                }
+                
+                // Redirect to dashboard
+                if (role === 'recruiter') {
+                    replace('/dash/manage');
+                } else {
+                    replace('/dash/job-feed');
+                }
             } else {
-                notify(message, 'error');
+                notify(result.message || 'Error signing up', 'error');
             }
         } catch (error) {
             console.error('Signup error:', error);

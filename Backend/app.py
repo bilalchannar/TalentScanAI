@@ -465,7 +465,26 @@ def signup():
         "created_at": datetime.now(timezone.utc)
     })
 
-    return response(201, "User registered successfully")
+    # Fetch newly inserted user for ID (for audit log)
+    user = users_collection.find_one({ "email": email })
+
+    now_utc = datetime.now(timezone.utc)
+    token_payload = {
+        "email": email,
+        "role": role,
+        "iat": now_utc,
+        "exp": now_utc + timedelta(minutes=JWT_EXP_MINUTES)
+    }
+    token = jwt.encode(token_payload, JWT_SECRET_KEY, algorithm="HS256")
+
+    log_audit_action(user_id=user["_id"], action="signup", target_type="user", target_id=str(user["_id"]), metadata={"email": email, "ip": request.remote_addr})
+
+    return response(201, "User registered successfully", {
+        "token": token,
+        "role": role,
+        "name": name,
+        "email": email
+    })
 
 # ---------------------------------------------------------------------------- #
 
@@ -2865,6 +2884,77 @@ def export_candidates():
     response_csv.headers["Content-type"] = "text/csv"
     return response_csv
 
+def seed_market_demand_jobs():
+    """Seed 5-6 latest market demand jobs if the jobs collection is empty."""
+    if jobs_collection.count_documents({}) == 0:
+        print("Seeding market demand jobs...")
+        now = datetime.now(timezone.utc)
+        jobs = [
+            {
+                "title": "Senior Frontend Engineer (Svelte)",
+                "company": "TechInnovate Inc.",
+                "location": "Remote",
+                "description": "We are looking for an experienced Frontend Engineer with deep expertise in Svelte and SvelteKit to build highly interactive and performant web applications. You should have 5+ years of experience with modern JavaScript, CSS, and component-driven architecture.",
+                "requirements": "Svelte, JavaScript, CSS, Frontend Architecture, 5+ years experience",
+                "posted_by": "recruiter@example.com",
+                "status": "active",
+                "created_at": now
+            },
+            {
+                "title": "Machine Learning Engineer (NLP)",
+                "company": "AI Dynamics",
+                "location": "San Francisco, CA (Hybrid)",
+                "description": "Join our AI research team to build next-generation NLP models. You will be responsible for fine-tuning LLMs and integrating them into production pipelines using Python, PyTorch, and LangChain.",
+                "requirements": "Python, PyTorch, NLP, LLMs, LangChain, Machine Learning",
+                "posted_by": "recruiter@example.com",
+                "status": "active",
+                "created_at": now
+            },
+            {
+                "title": "Full Stack Developer (Python/React)",
+                "company": "Fintech Solutions",
+                "location": "New York, NY",
+                "description": "Seeking a Full Stack Developer to help build scalable financial platforms. Backend is in Python (Flask/FastAPI) and frontend is in React. Strong understanding of REST APIs and MongoDB is required.",
+                "requirements": "Python, Flask, React, MongoDB, REST APIs, 3+ years experience",
+                "posted_by": "recruiter@example.com",
+                "status": "active",
+                "created_at": now
+            },
+            {
+                "title": "Cloud DevOps Engineer",
+                "company": "CloudScale Systems",
+                "location": "Remote",
+                "description": "Looking for a DevOps engineer to manage our AWS infrastructure. You will write infrastructure as code (Terraform), manage Kubernetes clusters, and build CI/CD pipelines using GitHub Actions.",
+                "requirements": "AWS, Kubernetes, Terraform, CI/CD, Docker, Linux",
+                "posted_by": "recruiter@example.com",
+                "status": "active",
+                "created_at": now
+            },
+            {
+                "title": "Data Scientist",
+                "company": "DataCorp",
+                "location": "London, UK (Hybrid)",
+                "description": "We need a Data Scientist to analyze complex datasets and build predictive models. You should be proficient in Python, SQL, pandas, scikit-learn, and have experience with A/B testing and statistical analysis.",
+                "requirements": "Python, SQL, Pandas, Scikit-learn, Statistics, Data Analysis",
+                "posted_by": "recruiter@example.com",
+                "status": "active",
+                "created_at": now
+            },
+            {
+                "title": "Cybersecurity Analyst",
+                "company": "SecureNet",
+                "location": "Remote",
+                "description": "Protect our infrastructure from threats. You will monitor networks, perform vulnerability assessments, and respond to security incidents. CISSP or equivalent certification is a plus.",
+                "requirements": "Cybersecurity, Network Security, Vulnerability Assessment, SIEM, Incident Response",
+                "posted_by": "recruiter@example.com",
+                "status": "active",
+                "created_at": now
+            }
+        ]
+        jobs_collection.insert_many(jobs)
+        print(f"Seeded {len(jobs)} jobs successfully.")
+
 # ---------------------------------------------------------------------------- #
 if __name__ == '__main__':
+    seed_market_demand_jobs()
     app.run(host="0.0.0.0", port=3000, debug=FLASK_DEBUG_ENABLED)

@@ -29,11 +29,7 @@
                 body: JSON.stringify({ job_description: jobDescription })
             });
 
-            if (res.status === 401) {
-                notify('Session expired. Please login again.', 'error');
-                push('/auth/login');
-                return;
-            }
+            });
 
             const result = await res.json();
             

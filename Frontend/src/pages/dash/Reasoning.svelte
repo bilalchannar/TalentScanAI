@@ -9,6 +9,7 @@
 
     let report = null;
     let unsubscribe;
+    let userRole = localStorage.getItem('role') || 'candidate';
 
     let questions = [];
     let loadingQuestions = false;
@@ -247,8 +248,9 @@
             </div>
 
             <!-- Interview Questions Guide Generator -->
-            <div class="report-card glass questions-card full-width">
-                <div class="q-header">
+            {#if userRole === 'candidate'}
+                <div class="report-card glass questions-card full-width">
+                    <div class="q-header">
                     <div>
                         <h3>🙋 AI Interview Questions Guide</h3>
                         <p class="desc">Generate custom technical and HR questions tailored specifically to this match.</p>
@@ -280,7 +282,8 @@
                         {/if}
                     </div>
                 {/if}
-            </div>
+                </div>
+            {/if}
 
         </div>
     {/if}

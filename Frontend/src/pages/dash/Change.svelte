@@ -105,11 +105,7 @@
                 })
             });
 
-            if (res.status === 401) {
-                notify('Session expired. Please login again', 'error');
-                push('/auth/login');
-                return;
-            }
+            });
 
             const result = await res.json();
             if (result.success) {

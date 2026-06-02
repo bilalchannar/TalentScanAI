@@ -5,7 +5,7 @@
     export let color = "var(--accent-primary)";
 </script>
 
-<div class="stats-card" style="--card-color: {color}">
+<div class="stats-card" style="--card-color: {color}" on:click>
     <div class="icon-wrapper">
         <span class="icon">{icon}</span>
     </div>
@@ -28,6 +28,7 @@
         transition: var(--transition);
         flex: 1;
         min-width: 250px;
+        cursor: pointer;
     }
 
     .stats-card:hover {
