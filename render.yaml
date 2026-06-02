@@ -25,7 +25,9 @@ services:
       - key: EXPOSE_RESET_TOKEN
         value: "false"
       - key: FLASK_DEBUG
-        value: "false"
+        value: "true" # Temporarily enabled to see the exact error
+      - key: PYTHONUNBUFFERED
+        value: "true" # Forces Python to show logs immediately
       - key: CORS_ALLOWED_ORIGINS
         value: https://talentscan-frontend.onrender.com # The frontend URL, adjust if renamed
 
