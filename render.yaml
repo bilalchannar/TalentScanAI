@@ -28,14 +28,12 @@ services:
         value: https://talentscan-frontend.onrender.com # The frontend URL, adjust if renamed
 
   # Frontend Static Site
-  - type: static
+  - type: web
     name: talentscan-frontend
+    env: static
     rootDir: Frontend
     buildCommand: npm install && npm run build
     staticPublishPath: public
-    envVars:
-      - key: NODE_ENV
-        value: production
     headers:
       - path: /*
         name: Access-Control-Allow-Origin
